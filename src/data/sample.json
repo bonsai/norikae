@@ -1,0 +1,91 @@
+
+[
+  {
+    "id": 1,
+    "question": "🍳 朝食を作る順序に並べてね！",
+    "hint": "正しい調理の流れを考えよう",
+    "items": [
+      { "id": "item-1", "text": "🔥 火をつける", "order": 3 },
+      { "id": "item-2", "text": "🥚 卵を割る", "order": 2 },
+      { "id": "item-3", "text": "🍳 フライパンを用意", "order": 1 },
+      { "id": "item-4", "text": "🧂 味付けして完成", "order": 4 }
+    ]
+  },
+  {
+    "id": 2,
+    "question": "🎬 映画を観る準備の順序は？",
+    "hint": "家で映画を観る時の流れを考えよう",
+    "items": [
+      { "id": "item-1", "text": "🍿 お菓子を準備", "order": 2 },
+      { "id": "item-2", "text": "🛋️ ソファに座る", "order": 3 },
+      { "id": "item-3", "text": "📱 映画を選ぶ", "order": 1 },
+      { "id": "item-4", "text": "▶️ 再生ボタンを押す", "order": 4 }
+    ]
+  },
+  {
+    "id": 3,
+    "question": "🌸 桜が咲くまでの季節の流れは？",
+    "hint": "春に向かう季節の変化を考えよう",
+    "items": [
+      { "id": "item-1", "text": "❄️ 冬の終わり", "order": 1 },
+      { "id": "item-2", "text": "🌱 新芽が出る", "order": 2 },
+      { "id": "item-3", "text": "🌸 桜が咲く", "order": 3 },
+      { "id": "item-4", "text": "🌸🌸 満開＆散る", "order": 4 }
+    ]
+  },
+  {
+    "id": 4,
+    "question": "📚 本を読む時の順序は？",
+    "hint": "本と向き合う流れを考えよう",
+    "items": [
+      { "id": "item-1", "text": "📖 目次を見る", "order": 2 },
+      { "id": "item-2", "text": "🤔 内容を考える", "order": 4 },
+      { "id": "item-3", "text": "👀 表紙を見る", "order": 1 },
+      { "id": "item-4", "text": "📄 本文を読む", "order": 3 }
+    ]
+  },
+  {
+    "id": 5,
+    "question": "🎂 誕生日パーティーの準備順序は？",
+    "hint": "パーティーの準備の流れを考えよう",
+    "items": [
+      { "id": "item-1", "text": "🎈 風船を飾る", "order": 3 },
+      { "id": "item-2", "text": "📅 日付を決める", "order": 1 },
+      { "id": "item-3", "text": "🎂 ケーキを注文", "order": 2 },
+      { "id": "item-4", "text": "🎉 パーティー開始！", "order": 4 }
+    ]
+  },
+  {
+    "id": 6,
+    "question": "🚀 ロケットが宇宙に行く順序は？",
+    "hint": "ロケット発射の流れを考えよう",
+    "items": [
+      { "id": "item-1", "text": "🔥 エンジン点火", "order": 2 },
+      { "id": "item-2", "text": "🌌 宇宙到達！", "order": 4 },
+      { "id": "item-3", "text": "⏱️ カウントダウン", "order": 1 },
+      { "id": "item-4", "text": "🚀 離陸＆上昇", "order": 3 }
+    ]
+  },
+  {
+    "id": 7,
+    "question": "🍜 ラーメンを作る順序は？",
+    "hint": "ラーメン屋さんの調理の流れを考えよう",
+    "items": [
+      { "id": "item-1", "text": "🍜 麺を茹でる", "order": 2 },
+      { "id": "item-2", "text": "🥣 スープを温める", "order": 1 },
+      { "id": "item-3", "text": "🥬 具材を盛る", "order": 3 },
+      { "id": "item-4", "text": "✨ 出来上がり！", "order": 4 }
+    ]
+  },
+  {
+    "id": 8,
+    "question": "🎮 ゲームを始める時の順序は？",
+    "hint": "ゲームをプレイするまでの流れを考えよう",
+    "items": [
+      { "id": "item-1", "text": "🎮 コントローラー取る", "order": 2 },
+      { "id": "item-2", "text": "🖥️ ゲーム機を起動", "order": 1 },
+      { "id": "item-3", "text": "📀 ゲームを選ぶ", "order": 3 },
+      { "id": "item-4", "text": "😄 プレイ開始！", "order": 4 }
+    ]
+  }
+]
