@@ -5,7 +5,7 @@ import { StartScreen } from '@/components/StartScreen';
 import { ResultScreen } from '@/components/ResultScreen';
 import type { QuizQuestion, QuizState } from '@/types/quiz';
 import devices from '@/data/device.json';
-import { DeviceCard } from '@/components/DeviceCard';
+
 
 // Helper function to parse string values into a comparable number
 const parseUnitValue = (value: string): number => {
