@@ -1,1 +1,934 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NORIKAE MASTER - 東京メトロ乗り換えクイズ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/framer-motion@11/dist/framer-motion.js" crossorigin></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'M PLUS Rounded 1c', 'Rounded Mplus 1c', sans-serif;
+      background: linear-gradient(160deg, #e8f0ff 0%, #ffe8e8 50%, #e8fff0 100%);
+      min-height: 100svh;
+    }
+    #root {
+      min-height: 100svh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useCallback, useRef } = React;
+    const { motion, AnimatePresence } = window.Motion;
+
+    // ─── クイズデータ ──────────────────────────────────────────
+    const LINE_COLORS = {
+      '銀座線':   '#F5A623',
+      '丸ノ内線': '#E60012',
+      '日比谷線': '#9B9EA0',
+      '東西線':   '#009BBF',
+      '千代田線': '#00BB85',
+      '有楽町線': '#C1A900',
+      '半蔵門線': '#8F76D6',
+      '南北線':   '#00AC9B',
+      '副都心線': '#9C5E31',
+    };
+
+    const DIFFICULTY_LABELS = {
+      easy:   { label: 'かんたん',   color: '#4CAF50', emoji: '⭐' },
+      normal: { label: 'ふつう',     color: '#FF9800', emoji: '⭐⭐' },
+      hard:   { label: 'むずかしい', color: '#F44336', emoji: '⭐⭐⭐' },
+    };
+
+    const QUIZ_QUESTIONS = [
+      // ===== EASY =====
+      {
+        id: 1,
+        question: '銀座線と丸ノ内線が\nおなじホームで\nのりかえできる駅は？',
+        hint: 'アカサカ…',
+        choices: ['表参道', '赤坂見附', '溜池山王', '銀座'],
+        correctIndex: 1,
+        explanation: '赤坂見附駅は島式ホームの両側に銀座線と丸ノ内線が来るよ！ホームをわたるだけでのりかえできる、すごく便利な駅だよ。',
+        lineColor: LINE_COLORS['銀座線'],
+        lineColor2: LINE_COLORS['丸ノ内線'],
+        lineName: '銀座線',
+        lineName2: '丸ノ内線',
+        difficulty: 'easy',
+        emoji: '🚇',
+      },
+      {
+        id: 2,
+        question: '半蔵門線に乗ったまま\n東急田園都市線に\nいける駅は？',
+        hint: 'スクランブル交差点が有名！',
+        choices: ['渋谷', '表参道', '押上', '三軒茶屋'],
+        correctIndex: 0,
+        explanation: '渋谷駅では半蔵門線と東急田園都市線がおなじホームでつながっているよ。のりかえなしで中央林間まで行けるよ！',
+        lineColor: LINE_COLORS['半蔵門線'],
+        lineColor2: '#E9171F',
+        lineName: '半蔵門線',
+        lineName2: '田園都市線',
+        difficulty: 'easy',
+        emoji: '🌀',
+      },
+      {
+        id: 3,
+        question: '東西線に乗ったまま\nJR中央・総武線に\nいける駅は？',
+        hint: '東京の西のほうにある駅だよ',
+        choices: ['大手町', '西船橋', '中野', '茅場町'],
+        correctIndex: 2,
+        explanation: '中野駅では東西線とJR中央・総武線がつながっているよ。三鷹まで直通で行けるよ！',
+        lineColor: LINE_COLORS['東西線'],
+        lineColor2: '#F15A22',
+        lineName: '東西線',
+        lineName2: 'JR中央・総武線',
+        difficulty: 'easy',
+        emoji: '🚂',
+      },
+      {
+        id: 4,
+        question: '南北線に乗ったまま\n東急目黒線に\nいける駅は？',
+        hint: 'め…ぐ…',
+        choices: ['目黒', '白金台', '溜池山王', '後楽園'],
+        correctIndex: 0,
+        explanation: '目黒駅では南北線と東急目黒線がおなじホームでつながっているよ。都営三田線も直通で走っているよ！',
+        lineColor: LINE_COLORS['南北線'],
+        lineColor2: '#00BB85',
+        lineName: '南北線',
+        lineName2: '東急目黒線',
+        difficulty: 'easy',
+        emoji: '🌿',
+      },
+      {
+        id: 5,
+        question: '副都心線に乗ったまま\n東急東横線に\nいける駅は？',
+        hint: 'ハチ公がいる駅！',
+        choices: ['池袋', '新宿三丁目', '渋谷', '和光市'],
+        correctIndex: 2,
+        explanation: '渋谷駅では副都心線と東急東横線がおなじホームでつながっているよ。元町・中華街まで直通で行けるよ！',
+        lineColor: LINE_COLORS['副都心線'],
+        lineColor2: '#E9171F',
+        lineName: '副都心線',
+        lineName2: '東急東横線',
+        difficulty: 'easy',
+        emoji: '🐕',
+      },
+      {
+        id: 6,
+        question: '千代田線に乗ったまま\n小田急線に\nいける駅は？',
+        hint: 'よよぎ…',
+        choices: ['表参道', '代々木上原', '北千住', '綾瀬'],
+        correctIndex: 1,
+        explanation: '代々木上原駅では千代田線と小田急線がつながっているよ。本厚木や唐木田まで直通で行けるよ！',
+        lineColor: LINE_COLORS['千代田線'],
+        lineColor2: '#0066B3',
+        lineName: '千代田線',
+        lineName2: '小田急線',
+        difficulty: 'easy',
+        emoji: '🏔️',
+      },
+      // ===== NORMAL =====
+      {
+        id: 7,
+        question: '東京メトロで\n改札を出ないで乗り換えると\n何分以内にしないといけない？',
+        hint: '1時間は何分？',
+        choices: ['30分', '45分', '60分', '90分'],
+        correctIndex: 2,
+        explanation: '東京メトロでは改札を出て別の路線に乗り換えるとき、60分（1時間）以内なら追加料金なしで乗れるよ！これを「60分ルール」というよ。',
+        lineColor: '#003087',
+        lineName: '東京メトロ',
+        difficulty: 'normal',
+        emoji: '⏰',
+      },
+      {
+        id: 8,
+        question: '有楽町線と副都心線が\n東武東上線に\nつながっている駅は？',
+        hint: '埼玉県にある駅だよ',
+        choices: ['池袋', '小竹向原', '和光市', '志木'],
+        correctIndex: 2,
+        explanation: '和光市駅では有楽町線・副都心線と東武東上線がつながっているよ。森林公園や小川町まで直通で行けるよ！',
+        lineColor: LINE_COLORS['有楽町線'],
+        lineColor2: LINE_COLORS['副都心線'],
+        lineName: '有楽町線',
+        lineName2: '副都心線',
+        difficulty: 'normal',
+        emoji: '🌲',
+      },
+      {
+        id: 9,
+        question: '半蔵門線に乗ったまま\n東武スカイツリーラインに\nいける駅は？',
+        hint: 'スカイツリーの近くにある駅！',
+        choices: ['北千住', '押上', '渋谷', '錦糸町'],
+        correctIndex: 1,
+        explanation: '押上駅では半蔵門線と東武スカイツリーラインがつながっているよ。日光や鬼怒川まで直通で行けるよ！',
+        lineColor: LINE_COLORS['半蔵門線'],
+        lineColor2: '#F5A623',
+        lineName: '半蔵門線',
+        lineName2: '東武スカイツリーライン',
+        difficulty: 'normal',
+        emoji: '🗼',
+      },
+      {
+        id: 10,
+        question: '東西線が東葉高速線に\nつながっている駅は？',
+        hint: '千葉県にある駅だよ',
+        choices: ['中野', '大手町', '西船橋', '葛西'],
+        correctIndex: 2,
+        explanation: '西船橋駅では東西線と東葉高速線がつながっているよ。東葉勝田台まで直通で行けるよ！',
+        lineColor: LINE_COLORS['東西線'],
+        lineColor2: '#E60012',
+        lineName: '東西線',
+        lineName2: '東葉高速線',
+        difficulty: 'normal',
+        emoji: '🌊',
+      },
+      {
+        id: 11,
+        question: '九段下駅でおなじホームで\nのりかえできる2つの路線は？',
+        hint: '2013年にかべが取り除かれたよ',
+        choices: [
+          '銀座線と丸ノ内線',
+          '東西線と半蔵門線',
+          '千代田線と南北線',
+          '日比谷線と有楽町線',
+        ],
+        correctIndex: 1,
+        explanation: '九段下駅では2013年にホームのかべが取り除かれて、東西線と半蔵門線がおなじホームでのりかえできるようになったよ！都営新宿線は別の改札だよ。',
+        lineColor: LINE_COLORS['東西線'],
+        lineColor2: LINE_COLORS['半蔵門線'],
+        lineName: '東西線',
+        lineName2: '半蔵門線',
+        difficulty: 'normal',
+        emoji: '🏯',
+      },
+      {
+        id: 12,
+        question: '大手町駅には東京メトロの\n何路線が乗り入れている？',
+        hint: '4つの線が集まる大きな駅！',
+        choices: ['2路線', '3路線', '4路線', '5路線'],
+        correctIndex: 2,
+        explanation: '大手町駅には丸ノ内線・東西線・千代田線・半蔵門線の4路線が乗り入れているよ。都営三田線も近くにあるよ！',
+        lineColor: LINE_COLORS['丸ノ内線'],
+        lineColor2: LINE_COLORS['東西線'],
+        lineName: '大手町',
+        difficulty: 'normal',
+        emoji: '🏢',
+      },
+      // ===== HARD =====
+      {
+        id: 13,
+        question: '東京メトロで一番\n乗り換えに歩く距離が長い\nのはどれ？',
+        hint: '765メートルも歩くよ！',
+        choices: [
+          '渋谷駅（銀座線↔副都心線）',
+          '大手町駅（丸ノ内線↔半蔵門線）',
+          '国会議事堂前（丸ノ内線）↔溜池山王（銀座線）',
+          '池袋駅（丸ノ内線↔有楽町線）',
+        ],
+        correctIndex: 2,
+        explanation: '国会議事堂前駅（丸ノ内線）から溜池山王駅（銀座線）への乗り換えは765メートルもあるよ！東京駅の八重洲口から八丁堀まで歩く距離と同じくらいだよ。',
+        lineColor: LINE_COLORS['丸ノ内線'],
+        lineColor2: LINE_COLORS['銀座線'],
+        lineName: '丸ノ内線',
+        lineName2: '銀座線',
+        difficulty: 'hard',
+        emoji: '👟',
+      },
+      {
+        id: 14,
+        question: '南北線が埼玉高速鉄道に\nつながっている駅は？',
+        hint: 'あかばね…いわ…',
+        choices: ['浦和美園', '赤羽岩淵', '王子', '志茂'],
+        correctIndex: 1,
+        explanation: '赤羽岩淵駅では南北線と埼玉高速鉄道がつながっているよ。浦和美園まで直通で行けるよ！',
+        lineColor: LINE_COLORS['南北線'],
+        lineColor2: '#E60012',
+        lineName: '南北線',
+        lineName2: '埼玉高速鉄道',
+        difficulty: 'hard',
+        emoji: '⚽',
+      },
+      {
+        id: 15,
+        question: '千代田線がJR常磐線に\nつながっている駅は？',
+        hint: 'あや…せ',
+        choices: ['北千住', '綾瀬', '松戸', '我孫子'],
+        correctIndex: 1,
+        explanation: '綾瀬駅では千代田線とJR常磐線各停がつながっているよ。取手や我孫子まで直通で行けるよ！',
+        lineColor: LINE_COLORS['千代田線'],
+        lineColor2: '#F15A22',
+        lineName: '千代田線',
+        lineName2: 'JR常磐線',
+        difficulty: 'hard',
+        emoji: '🌾',
+      },
+      {
+        id: 16,
+        question: '有楽町線・副都心線が\n西武池袋線につながっている\n駅は？',
+        hint: 'こたけ…むかいはら',
+        choices: ['池袋', '練馬', '小竹向原', '石神井公園'],
+        correctIndex: 2,
+        explanation: '小竹向原駅では有楽町線・副都心線と西武池袋線がつながっているよ。飯能や所沢まで直通で行けるよ！',
+        lineColor: LINE_COLORS['副都心線'],
+        lineColor2: '#0066B3',
+        lineName: '副都心線',
+        lineName2: '西武池袋線',
+        difficulty: 'hard',
+        emoji: '🎪',
+      },
+      {
+        id: 17,
+        question: '副都心線の特急「Fライナー」は\nどこからどこまで走っている？',
+        hint: '神奈川県の港町まで行くよ！',
+        choices: [
+          '和光市〜渋谷',
+          '飯能〜元町・中華街',
+          '池袋〜横浜',
+          '小竹向原〜みなとみらい',
+        ],
+        correctIndex: 1,
+        explanation: 'Fライナーは西武線の飯能から東武線・副都心線・東急東横線・みなとみらい線を通って元町・中華街まで走る特急列車だよ！',
+        lineColor: LINE_COLORS['副都心線'],
+        lineColor2: '#E9171F',
+        lineName: '副都心線',
+        lineName2: 'Fライナー',
+        difficulty: 'hard',
+        emoji: '⚡',
+      },
+      {
+        id: 18,
+        question: '日比谷線と東武スカイツリーラインが\nつながっている駅は？',
+        hint: 'きた…せん…じゅ',
+        choices: ['押上', '北千住', '曳舟', '東武動物公園'],
+        correctIndex: 1,
+        explanation: '北千住駅では日比谷線と東武スカイツリーラインがつながっているよ。千代田線・JR常磐線も乗り入れる大きな駅だよ！',
+        lineColor: LINE_COLORS['日比谷線'],
+        lineColor2: '#F5A623',
+        lineName: '日比谷線',
+        lineName2: '東武スカイツリーライン',
+        difficulty: 'hard',
+        emoji: '🦁',
+      },
+    ];
+
+    // ─── ユーティリティ ────────────────────────────────────────
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    // ─── 定数 ──────────────────────────────────────────────────
+    const CHOICE_COLORS = ['#E53E3E', '#3182CE', '#38A169', '#D69E2E'];
+    const CHOICE_LABELS = ['A', 'B', 'C', 'D'];
+
+    // ─── サブコンポーネント ────────────────────────────────────
+
+    function LineBadge({ name, color }) {
+      return (
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '2px 8px',
+            borderRadius: '9999px',
+            backgroundColor: color,
+            color: '#fff',
+            fontSize: '11px',
+            fontWeight: 700,
+          }}
+        >
+          {name}
+        </span>
+      );
+    }
+
+    function Stars({ count }) {
+      return (
+        <span style={{ color: '#FBBF24', fontSize: '14px' }}>
+          {'★'.repeat(count)}{'☆'.repeat(3 - count)}
+        </span>
+      );
+    }
+
+    // ─── タイトル画面 ──────────────────────────────────────────
+    function TitleScreen({ onStart }) {
+      const topColors = ['#F5A623','#E60012','#9B9EA0','#009BBF','#00BB85'];
+      const botColors = ['#C1A900','#8F76D6','#00AC9B','#9C5E31'];
+
+      return (
+        <motion.div
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '0 24px', textAlign: 'center', width: '100%' }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '8px' }}>
+              {topColors.map((c, i) => (
+                <motion.div
+                  key={i}
+                  style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: c, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ duration: 1.2, delay: i * 0.15, repeat: Infinity }}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              {botColors.map((c, i) => (
+                <motion.div
+                  key={i}
+                  style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: c, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ duration: 1.2, delay: (i + 5) * 0.15, repeat: Infinity }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <motion.div
+            animate={{ rotate: [-2, 2, -2] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            style={{ fontSize: '56px', marginBottom: '12px' }}
+          >
+            🚇
+          </motion.div>
+
+          <h1 style={{ fontSize: '48px', fontWeight: 900, letterSpacing: '-1px', margin: '0 0 4px', color: '#0d0d2b', textShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+            NORIKAE
+          </h1>
+          <h1 style={{ fontSize: '48px', fontWeight: 900, letterSpacing: '-1px', margin: '0 0 8px', color: '#0d0d2b', textShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+            MASTER
+          </h1>
+          <p style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 4px', color: '#444' }}>東京メトロ のりかえクイズ</p>
+          <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 32px', color: '#888' }}>全{QUIZ_QUESTIONS.length}問</p>
+
+          <motion.button
+            onClick={onStart}
+            style={{
+              width: '100%', maxWidth: '280px', padding: '20px',
+              borderRadius: '24px', border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(135deg, #E60012 0%, #F5A623 100%)',
+              boxShadow: '0 8px 24px rgba(230,0,18,0.35)',
+              color: '#fff', fontSize: '20px', fontWeight: 900,
+              fontFamily: 'inherit',
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            🎮 はじめる！
+          </motion.button>
+
+          <p style={{ fontSize: '12px', color: '#aaa', marginTop: '16px' }}>タップしてスタート</p>
+        </motion.div>
+      );
+    }
+
+    // ─── 難易度選択画面 ────────────────────────────────────────
+    function SelectScreen({ onSelect }) {
+      const modes = [
+        { key: 'easy',   label: 'かんたん',   desc: '⭐ 6もん',    color: '#4CAF50', emoji: '😊' },
+        { key: 'normal', label: 'ふつう',     desc: '⭐⭐ 6もん',  color: '#FF9800', emoji: '😤' },
+        { key: 'hard',   label: 'むずかしい', desc: '⭐⭐⭐ 6もん', color: '#F44336', emoji: '🔥' },
+        { key: 'all',    label: 'ぜんぶ',     desc: '全18もん',    color: '#9C27B0', emoji: '🏆' },
+      ];
+
+      return (
+        <motion.div
+          style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '24px 20px' }}
+          initial={{ opacity: 0, x: 40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -40 }}
+        >
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎯</div>
+            <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#1f2937', margin: 0 }}>レベルをえらぼう！</h2>
+            <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>すきなレベルをタップしてね</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, justifyContent: 'center' }}>
+            {modes.map((m, i) => (
+              <motion.button
+                key={m.key}
+                onClick={() => onSelect(m.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '16px',
+                  padding: '20px', borderRadius: '24px', border: 'none', cursor: 'pointer',
+                  background: `linear-gradient(135deg, ${m.color}dd, ${m.color}99)`,
+                  color: '#fff', fontFamily: 'inherit',
+                  boxShadow: `0 4px 12px ${m.color}44`,
+                }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                whileHover={{ scale: 1.03, x: 4 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <span style={{ fontSize: '40px' }}>{m.emoji}</span>
+                <div style={{ textAlign: 'left', flex: 1 }}>
+                  <div style={{ fontSize: '20px', fontWeight: 900 }}>{m.label}</div>
+                  <div style={{ fontSize: '14px', opacity: 0.8 }}>{m.desc}</div>
+                </div>
+                <span style={{ fontSize: '24px' }}>→</span>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      );
+    }
+
+    // ─── 選択肢ボタン ──────────────────────────────────────────
+    function ChoiceButton({ label, text, color, state, onClick, disabled }) {
+      const bgMap = {
+        idle:    `${color}22`,
+        correct: color,
+        wrong:   '#ef444422',
+        dim:     '#f3f4f6',
+      };
+      const borderMap = {
+        idle:    `2px solid ${color}66`,
+        correct: `2px solid ${color}`,
+        wrong:   '2px solid #ef444466',
+        dim:     '2px solid #e5e7eb',
+      };
+      const textMap = {
+        idle:    '#1a1a2e',
+        correct: '#ffffff',
+        wrong:   '#9ca3af',
+        dim:     '#9ca3af',
+      };
+
+      return (
+        <motion.button
+          onClick={onClick}
+          disabled={disabled}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '12px',
+            width: '100%', padding: '14px 16px', borderRadius: '16px',
+            textAlign: 'left', cursor: disabled ? 'default' : 'pointer',
+            background: bgMap[state],
+            border: borderMap[state],
+            color: textMap[state],
+            fontFamily: 'inherit',
+          }}
+          whileHover={!disabled ? { scale: 1.02 } : {}}
+          whileTap={!disabled ? { scale: 0.98 } : {}}
+          animate={state === 'correct' ? { scale: [1, 1.04, 1] } : {}}
+          transition={{ duration: 0.3 }}
+        >
+          <span
+            style={{
+              flexShrink: 0, width: '36px', height: '36px', borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 900, fontSize: '14px',
+              background: state === 'correct' ? 'rgba(255,255,255,0.3)' : `${color}33`,
+              color: state === 'correct' ? '#fff' : color,
+            }}
+          >
+            {state === 'correct' ? '✓' : state === 'wrong' ? '✗' : label}
+          </span>
+          <span style={{ fontWeight: 700, fontSize: '14px', lineHeight: 1.4 }}>{text}</span>
+        </motion.button>
+      );
+    }
+
+    // ─── クイズプレイ画面 ──────────────────────────────────────
+    function PlayScreen({ questions, onFinish }) {
+      const [idx, setIdx] = useState(0);
+      const [score, setScore] = useState(0);
+      const [answerState, setAnswerState] = useState('idle');
+      const [selectedIdx, setSelectedIdx] = useState(null);
+      const [showExplanation, setShowExplanation] = useState(false);
+      const scoreRef = useRef(0);
+
+      const q = questions[idx];
+      const diffInfo = DIFFICULTY_LABELS[q.difficulty];
+      const c1 = q.lineColor;
+      const c2 = q.lineColor2 || q.lineColor;
+
+      const handleAnswer = useCallback((choiceIdx) => {
+        if (answerState !== 'idle') return;
+        setSelectedIdx(choiceIdx);
+        if (choiceIdx === q.correctIndex) {
+          setAnswerState('correct');
+          scoreRef.current = scoreRef.current + 1;
+          setScore(s => s + 1);
+        } else {
+          setAnswerState('wrong');
+        }
+        setShowExplanation(true);
+      }, [answerState, q.correctIndex]);
+
+      const handleNext = useCallback(() => {
+        if (idx + 1 >= questions.length) {
+          onFinish(scoreRef.current, questions.length);
+        } else {
+          setIdx(i => i + 1);
+          setAnswerState('idle');
+          setSelectedIdx(null);
+          setShowExplanation(false);
+        }
+      }, [idx, questions.length, onFinish]);
+
+      const progress = (idx / questions.length) * 100;
+      const progressAfter = ((idx + 1) / questions.length) * 100;
+
+      return (
+        <motion.div
+          key={idx}
+          style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+          initial={{ opacity: 0, x: 30 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -30 }}
+          transition={{ duration: 0.3 }}
+        >
+          {/* ヘッダー */}
+          <div style={{ padding: '20px 20px 16px', borderRadius: '0 0 24px 24px', background: `linear-gradient(135deg, ${c1}, ${c2})`, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                <LineBadge name={q.lineName} color="rgba(255,255,255,0.3)" />
+                {q.lineName2 && <LineBadge name={q.lineName2} color="rgba(255,255,255,0.3)" />}
+              </div>
+              <span style={{ color: '#fff', fontWeight: 900, fontSize: '14px', opacity: 0.9 }}>
+                {idx + 1} / {questions.length}
+              </span>
+            </div>
+
+            {/* プログレスバー */}
+            <div style={{ width: '100%', height: '8px', borderRadius: '9999px', background: 'rgba(255,255,255,0.3)', overflow: 'hidden' }}>
+              <motion.div
+                style={{ height: '100%', borderRadius: '9999px', background: '#fff' }}
+                initial={{ width: `${progress}%` }}
+                animate={{ width: `${progressAfter}%` }}
+                transition={{ duration: 0.4 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Stars count={q.difficulty === 'easy' ? 1 : q.difficulty === 'normal' ? 2 : 3} />
+                <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>{diffInfo.label}</span>
+              </div>
+              <span style={{ color: '#fff', fontWeight: 900, fontSize: '14px' }}>スコア: {score}</span>
+            </div>
+          </div>
+
+          {/* 問題文 */}
+          <div style={{ padding: '16px 20px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <span style={{ fontSize: '32px', flexShrink: 0 }}>{q.emoji}</span>
+              <p style={{ fontWeight: 900, color: '#1f2937', lineHeight: 1.5, fontSize: '17px', whiteSpace: 'pre-line', margin: 0 }}>
+                {q.question}
+              </p>
+            </div>
+            {q.hint && answerState === 'idle' && (
+              <motion.div
+                style={{ marginTop: '8px', padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, color: '#6b7280', background: '#f3f4f6' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.5 }}
+              >
+                💡 ヒント: {q.hint}
+              </motion.div>
+            )}
+          </div>
+
+          {/* 選択肢 */}
+          <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+            {q.choices.map((choice, i) => {
+              let state = 'idle';
+              if (answerState !== 'idle') {
+                if (i === q.correctIndex) state = 'correct';
+                else if (i === selectedIdx) state = 'wrong';
+                else state = 'dim';
+              }
+              return (
+                <ChoiceButton
+                  key={i}
+                  label={CHOICE_LABELS[i]}
+                  text={choice}
+                  color={CHOICE_COLORS[i]}
+                  state={state}
+                  onClick={() => handleAnswer(i)}
+                  disabled={answerState !== 'idle'}
+                />
+              );
+            })}
+          </div>
+
+          {/* 解説・次へ */}
+          <AnimatePresence>
+            {showExplanation && (
+              <motion.div
+                style={{ padding: '12px 20px 20px' }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+              >
+                <div style={{
+                  borderRadius: '16px', padding: '12px', marginBottom: '12px', textAlign: 'center',
+                  background: answerState === 'correct'
+                    ? 'linear-gradient(135deg, #4CAF50, #8BC34A)'
+                    : 'linear-gradient(135deg, #F44336, #FF5722)',
+                }}>
+                  <p style={{ color: '#fff', fontWeight: 900, fontSize: '18px', margin: 0 }}>
+                    {answerState === 'correct' ? '🎉 せいかい！' : '😢 ざんねん…'}
+                  </p>
+                </div>
+
+                <div style={{
+                  borderRadius: '16px', padding: '12px', marginBottom: '12px',
+                  fontSize: '13px', color: '#374151', lineHeight: 1.6, fontWeight: 500,
+                  background: '#f8f9fa', border: '2px solid #e9ecef',
+                }}>
+                  {q.explanation}
+                </div>
+
+                <motion.button
+                  onClick={handleNext}
+                  style={{
+                    width: '100%', padding: '16px', borderRadius: '24px', border: 'none', cursor: 'pointer',
+                    background: `linear-gradient(135deg, ${c1}, ${c2})`,
+                    color: '#fff', fontSize: '18px', fontWeight: 900, fontFamily: 'inherit',
+                    boxShadow: `0 4px 16px ${c1}66`,
+                  }}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  {idx + 1 >= questions.length ? '🏁 けっかをみる！' : '→ つぎのもんだい'}
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      );
+    }
+
+    // ─── 結果画面 ──────────────────────────────────────────────
+    function ResultScreen({ score, total, onRetry, onHome }) {
+      const pct = Math.round((score / total) * 100);
+      const rank =
+        pct === 100 ? { label: 'のりかえマスター！', emoji: '👑', color: '#F5A623' } :
+        pct >= 80   ? { label: 'のりかえはかせ！',   emoji: '🎓', color: '#9C27B0' } :
+        pct >= 60   ? { label: 'のりかえじょうず！', emoji: '⭐', color: '#2196F3' } :
+        pct >= 40   ? { label: 'もう少し！',         emoji: '💪', color: '#4CAF50' } :
+                      { label: 'れんしゅうしよう！', emoji: '📚', color: '#FF9800' };
+
+      const allColors = Object.values(LINE_COLORS);
+      const conicDeg = pct * 3.6;
+
+      return (
+        <motion.div
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '24px', textAlign: 'center' }}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+        >
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {allColors.map((c, i) => (
+              <motion.div
+                key={i}
+                style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: c }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: i * 0.08, type: 'spring' }}
+              />
+            ))}
+          </div>
+
+          <motion.div
+            style={{ fontSize: '72px', marginBottom: '16px' }}
+            animate={{ rotate: [0, -10, 10, -10, 0] }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+          >
+            {rank.emoji}
+          </motion.div>
+
+          <h2 style={{ fontSize: '24px', fontWeight: 900, color: rank.color, margin: '0 0 4px' }}>
+            {rank.label}
+          </h2>
+
+          {/* スコア円グラフ */}
+          <div style={{
+            width: '144px', height: '144px', borderRadius: '50%', margin: '20px auto',
+            background: `conic-gradient(${rank.color} ${conicDeg}deg, #e5e7eb ${conicDeg}deg)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+          }}>
+            <div style={{
+              width: '112px', height: '112px', borderRadius: '50%', background: '#fff',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: '40px', fontWeight: 900, color: rank.color }}>{score}</span>
+              <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 700 }}>/ {total}もん</span>
+            </div>
+          </div>
+
+          <p style={{ color: '#6b7280', fontWeight: 700, marginBottom: '32px' }}>
+            せいかいりつ <span style={{ fontSize: '24px', fontWeight: 900, color: rank.color }}>{pct}%</span>
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '280px' }}>
+            <motion.button
+              onClick={onRetry}
+              style={{
+                width: '100%', padding: '16px', borderRadius: '24px', border: 'none', cursor: 'pointer',
+                background: `linear-gradient(135deg, ${rank.color}, ${rank.color}aa)`,
+                color: '#fff', fontSize: '18px', fontWeight: 900, fontFamily: 'inherit',
+                boxShadow: `0 4px 12px ${rank.color}44`,
+              }}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+            >
+              🔄 もういちど！
+            </motion.button>
+            <motion.button
+              onClick={onHome}
+              style={{
+                width: '100%', padding: '16px', borderRadius: '24px', cursor: 'pointer',
+                background: '#f3f4f6', color: '#374151', fontSize: '18px', fontWeight: 900,
+                fontFamily: 'inherit', border: '2px solid #e5e7eb',
+              }}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+            >
+              🏠 トップへ
+            </motion.button>
+          </div>
+        </motion.div>
+      );
+    }
+
+    // ─── メインコンポーネント ──────────────────────────────────
+    function Quiz() {
+      const [gameState, setGameState] = useState('title');
+      const [questions, setQuestions] = useState([]);
+      const [finalScore, setFinalScore] = useState(0);
+      const [finalTotal, setFinalTotal] = useState(0);
+      const [selectedMode, setSelectedMode] = useState('all');
+      const [isWide, setIsWide] = useState(window.innerWidth > 430);
+
+      useEffect(() => {
+        const handler = () => setIsWide(window.innerWidth > 430);
+        window.addEventListener('resize', handler);
+        return () => window.removeEventListener('resize', handler);
+      }, []);
+
+      const handleSelectMode = (mode) => {
+        setSelectedMode(mode);
+        const filtered = mode === 'all'
+          ? QUIZ_QUESTIONS
+          : QUIZ_QUESTIONS.filter(q => q.difficulty === mode);
+        setQuestions(shuffle(filtered));
+        setGameState('playing');
+      };
+
+      const handleFinish = (score, total) => {
+        setFinalScore(score);
+        setFinalTotal(total);
+        setGameState('result');
+      };
+
+      const handleRetry = () => {
+        const filtered = selectedMode === 'all'
+          ? QUIZ_QUESTIONS
+          : QUIZ_QUESTIONS.filter(q => q.difficulty === selectedMode);
+        setQuestions(shuffle(filtered));
+        setGameState('playing');
+      };
+
+      const lineColorValues = Object.values(LINE_COLORS);
+
+      return (
+        <div style={{
+          minHeight: '100svh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(160deg, #e8f0ff 0%, #ffe8e8 50%, #e8fff0 100%)',
+          width: '100%',
+        }}>
+          <div style={{
+            position: 'relative', width: '100%', overflow: 'hidden', background: '#fff',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+            maxWidth: '390px',
+            minHeight: '100svh',
+            maxHeight: '100svh',
+            borderRadius: isWide ? '40px' : '0',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            {/* 上部装飾バー */}
+            <div style={{ display: 'flex', height: '6px', flexShrink: 0 }}>
+              {lineColorValues.map((c, i) => (
+                <div key={i} style={{ flex: 1, backgroundColor: c }} />
+              ))}
+            </div>
+
+            {/* コンテンツ */}
+            <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+              <AnimatePresence mode="wait">
+                {gameState === 'title' && (
+                  <motion.div key="title" style={{ position: 'absolute', inset: 0 }}>
+                    <TitleScreen onStart={() => setGameState('select')} />
+                  </motion.div>
+                )}
+                {gameState === 'select' && (
+                  <motion.div key="select" style={{ position: 'absolute', inset: 0 }}>
+                    <SelectScreen onSelect={handleSelectMode} />
+                  </motion.div>
+                )}
+                {gameState === 'playing' && (
+                  <motion.div key="playing" style={{ position: 'absolute', inset: 0, overflowY: 'auto' }}>
+                    <PlayScreen questions={questions} onFinish={handleFinish} />
+                  </motion.div>
+                )}
+                {gameState === 'result' && (
+                  <motion.div key="result" style={{ position: 'absolute', inset: 0, overflowY: 'auto' }}>
+                    <ResultScreen
+                      score={finalScore}
+                      total={finalTotal}
+                      onRetry={handleRetry}
+                      onHome={() => setGameState('title')}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* 下部装飾バー */}
+            <div style={{ display: 'flex', height: '6px', flexShrink: 0 }}>
+              {[...lineColorValues].reverse().map((c, i) => (
+                <div key={i} style={{ flex: 1, backgroundColor: c }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── マウント ──────────────────────────────────────────────
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<Quiz />);
+  </script>
+</body>
+</html>
 
