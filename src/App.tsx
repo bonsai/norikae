@@ -7,26 +7,53 @@ import type { QuizQuestion, QuizState } from '@/types/quiz';
 import devices from '@/data/device.json';
 import { DeviceCard } from '@/components/DeviceCard';
 
-// device.jsonからクイズデータを生成
-const deviceQuiz: QuizQuestion = {
-  id: 1,
-  question: "💻 CPUビット幅が小さい順に並べてね！",
-  hint: "8ビットから64ビットまで、歴史を遡ろう",
-  items: devices
-    .map(device => ({
-      id: `device-${device.device.replace(/\s/g, '-')}`,
-      text: `${device.device} (${device.cpu_architecture})`,
-      // bit_widthから数値のみを抽出してorderに設定
-      order: parseInt(device.bit_width.match(/\d+/)?.[0] || "0"),
-    }))
-    // orderが小さい順にソートし、新しいorderを割り振る
-    .sort((a, b) => a.order - b.order)
-    .map((item, index) => ({ ...item, order: index + 1 }))
-    // 元の順番に戻す（クイズなのでシャッフル）
-    .sort(() => Math.random() - 0.5),
+// Helper function to parse string values into a comparable number
+const parseUnitValue = (value: string): number => {
+  const cleanedValue = value.replace(/≈|¥|,/g, '');
+  const match = cleanedValue.match(/([\d.]+)\s*(K|M|G)?(B|Hz)?/i);
+  if (!match) return 0;
+
+  let num = parseFloat(match[1]);
+  const unit = match[2]?.toUpperCase();
+
+  if (unit === 'K') num *= 1e3;
+  if (unit === 'M') num *= 1e6;
+  if (unit === 'G') num *= 1e9;
+  
+  return num;
 };
 
-const quizQuestions = [deviceQuiz];
+// Generic function to create a quiz question from device data
+const createQuizFromDevices = (
+  key: keyof typeof devices[0],
+  question: string,
+  hint: string,
+  ascending = true
+): QuizQuestion => {
+  const items = devices
+    .map(device => ({
+      id: `device-${device.device.replace(/\s/g, '-')}-${key}`,
+      text: `${device.device} (${device[key]})`,
+      value: parseUnitValue(String(device[key])),
+    }))
+    .sort((a, b) => ascending ? a.value - b.value : b.value - a.value)
+    .map((item, index) => ({
+      ...item,
+      order: index + 1,
+    }))
+    .sort(() => Math.random() - 0.5);
+
+  return { id: Math.random(), question, hint, items };
+};
+
+// Create multiple quiz questions
+const quizQuestions: QuizQuestion[] = [
+  createQuizFromDevices('bit_width', '💻 CPUビット幅が小さい順に並べてね！', '8ビットから64ビットまで、歴史を遡ろう'),
+  createQuizFromDevices('core_count', '🧠 CPUコア数が多い順に並べてね！', '多いほどたくさんの処理が同時にできるよ', false),
+  createQuizFromDevices('max_clock', '⚡️ クロック周波数が高い順に並べてね！', 'GHzはMHzの1000倍だよ', false),
+  createQuizFromDevices('ram', '💾 RAM容量が多い順に並べてね！', 'GBはMBの1000倍、MBはKBの1000倍だよ', false),
+  createQuizFromDevices('price_yen_2026', '💰 価格が安い順に並べてね！', '2026年時点の参考価格だよ'),
+];
 
 function App() {
   const [gameState, setGameState] = useState<'start' | 'playing' | 'result'>('start');
