@@ -1,0 +1,120 @@
+import React, { useState, useEffect } from 'react';
+
+const OpticalMelodyLock = () => {
+  const [doorOpen, setDoorOpen] = useState(false);
+  const [log, setLog] = useState(['UIAP System: Ready']);
+  const [activeBits, setActiveBits] = useState(0); // 4-bit for light
+  const [sync, setSync] = useState(false);
+  const [inputBuffer, setInputBuffer] = useState([]);
+
+  // 正解のメロディ（光のビット列）: 1(ド) -> 2(ミ) -> 4(ソ) -> 8(高いド)
+  const UNLOCK_PATTERN = [1, 2, 4, 8];
+
+  const addLog = (msg) => {
+    setLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 8));
+  };
+
+  // メロディ再生（スマホ側の動作）
+  const playMelody = async () => {
+    if (doorOpen) return;
+    addLog("スマホ: 鍵のメロディを送信中...");
+    
+    for (const bit of UNLOCK_PATTERN) {
+      // 1. 光をセット (Data Set)
+      setActiveBits(bit);
+      setSync(false);
+      await new Promise(r => setTimeout(r, 100));
+
+      // 2. クロック立ち上げ (UIAPが読み取るタイミング)
+      setSync(true);
+      processOpticalSignal(bit);
+      await new Promise(r => setTimeout(r, 300));
+
+      // 3. 消灯 (Reset)
+      setSync(false);
+      setActiveBits(0);
+      await new Promise(r => setTimeout(r, 100));
+    }
+  };
+
+  // UIAP側の解読ロジック
+  const processOpticalSignal = (bit) => {
+    setInputBuffer(prev => {
+      const newBuffer = [...prev, bit];
+      const currentStep = newBuffer.length - 1;
+
+      if (newBuffer[currentStep] === UNLOCK_PATTERN[currentStep]) {
+        addLog(`UIAP: ステップ ${newBuffer.length} 一致`);
+        if (newBuffer.length === UNLOCK_PATTERN.length) {
+          handleUnlock();
+          return [];
+        }
+        return newBuffer;
+      } else {
+        addLog("UIAP: パターン不一致、リセット");
+        return [];
+      }
+    });
+  };
+
+  const handleUnlock = () => {
+    setDoorOpen(true);
+    addLog("🔓 認証成功！サーボモータを90度回転します");
+    setTimeout(() => {
+      setDoorOpen(false);
+      addLog("🔒 施錠完了");
+    }, 5000);
+  };
+
+  return (
+    <div className="flex flex-col items-center min-h-screen bg-neutral-950 text-white p-6 font-mono">
+      <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
+        <h2 className="text-center text-lg font-bold mb-6 text-yellow-500">OPTICAL MELODY KEY</h2>
+
+        {/* 屋外：スマホ送信画面 */}
+        <div className="mb-8 p-4 border border-dashed border-neutral-700 rounded-xl bg-black">
+          <p className="text-[10px] text-neutral-500 mb-2">OUTSIDE: SMARTPHONE SCREEN</p>
+          <div className="grid grid-cols-2 grid-rows-2 gap-2 w-32 h-32 mx-auto">
+            <div className={`rounded ${activeBits & 1 ? 'bg-white shadow-[0_0_15px_white]' : 'bg-neutral-800'}`}></div>
+            <div className={`rounded ${activeBits & 2 ? 'bg-white shadow-[0_0_15px_white]' : 'bg-neutral-800'}`}></div>
+            <div className={`rounded ${activeBits & 4 ? 'bg-white shadow-[0_0_15px_white]' : 'bg-neutral-800'}`}></div>
+            <div className={`rounded ${sync ? 'bg-blue-500 shadow-[0_0_15px_#3b82f6]' : 'bg-neutral-800'}`}></div>
+          </div>
+          <button 
+            onClick={playMelody}
+            className="w-full mt-4 py-3 bg-yellow-600 hover:bg-yellow-500 text-black font-bold rounded-lg transition-colors"
+          >
+            メロディを再生
+          </button>
+        </div>
+
+        {/* 室内：UIAPユニット */}
+        <div className="p-4 bg-neutral-800 rounded-xl relative overflow-hidden">
+          <p className="text-[10px] text-neutral-400 mb-2">INSIDE: UIAP UNIT</p>
+          
+          {/* サーボモータのビジュアル */}
+          <div className="flex justify-center items-center h-24 mb-4">
+            <div className="relative w-16 h-16 bg-blue-600 rounded-lg">
+              <div 
+                className="absolute top-1/2 left-1/2 w-20 h-4 bg-gray-300 origin-left rounded-full transition-transform duration-500"
+                style={{ transform: `translate(0, -50%) rotate(${doorOpen ? 90 : 0}deg)` }}
+              ></div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full"></div>
+            </div>
+            <span className="ml-8 text-xl">{doorOpen ? '🔓' : '🔒'}</span>
+          </div>
+
+          <div className="text-[10px] bg-black p-2 rounded h-32 overflow-y-auto">
+            {log.map((l, i) => <div key={i} className={l.includes('成功') ? 'text-green-400' : 'text-gray-400'}>{l}</div>)}
+          </div>
+        </div>
+        
+        <p className="mt-4 text-[10px] text-neutral-600 text-center">
+          スマホが鳴らす音の周波数を4bitの光に変え、ガラス越しにUIAPが読み取ります
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default OpticalMelodyLock;

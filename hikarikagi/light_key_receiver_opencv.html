@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Light Key Receiver - OpenCV.js</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --bg: #0a0a0f;
+            --panel: #111118;
+            --border: #1e1e2e;
+            --accent: #00ffcc;
+            --accent2: #ff6b00;
+            --dim: #2a2a3a;
+            --text: #c8c8d8;
+            --muted: #555566;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 16px;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,204,0.015) 2px, rgba(0,255,204,0.015) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,255,204,0.008) 2px, rgba(0,255,204,0.008) 4px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1rem, 3vw, 1.4rem);
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: var(--accent);
+            text-shadow: 0 0 20px rgba(0,255,204,0.5);
+            margin-bottom: 6px;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            margin-bottom: 20px;
+            z-index: 1;
+        }
+
+        .container {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+            z-index: 1;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            flex: 1;
+            min-width: 400px;
+            max-width: 580px;
+        }
+
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 16px;
+            text-align: center;
+            letter-spacing: 0.1em;
+        }
+
+        /* Video container */
+        .video-container {
+            position: relative;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+
+        #videoElement {
+            width: 100%;
+            max-width: 480px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* LED detection display */
+        .led-display {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 20px;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .led {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #1a1a28;
+            border: 2px solid var(--dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            color: var(--muted);
+            transition: all 0.1s;
+        }
+
+        .led.on {
+            background: radial-gradient(circle at 30% 30%, #ffffff, #ffdd44 25%, #ff8800 60%, rgba(255,80,0,0) 70%);
+            border-color: var(--accent2);
+            color: #fff;
+            box-shadow: 0 0 30px rgba(255,107,0,0.8), 0 0 60px rgba(255,107,0,0.4);
+        }
+
+        /* Received message display */
+        .message-display {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            min-height: 60px;
+            margin: 16px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .char-box {
+            width: 40px;
+            height: 50px;
+            border: 1px solid var(--dim);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--muted);
+            background: var(--panel);
+            transition: all 0.2s;
+        }
+
+        .char-box.active {
+            border-color: var(--accent2);
+            color: var(--accent2);
+            background: rgba(255,107,0,0.12);
+            box-shadow: 0 0 12px rgba(255,107,0,0.4);
+        }
+
+        .char-box.received {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(0,255,204,0.08);
+        }
+
+        .char-box .hex {
+            font-size: 0.5rem;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        /* Status display */
+        .status-display {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .status-item {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 0.6rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .status-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-top: 4px;
+        }
+
+        .status-value.detected {
+            color: var(--accent2);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-transform: uppercase;
+        }
+
+        .btn-start {
+            background: rgba(0,255,204,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn-start:hover {
+            background: rgba(0,255,204,0.2);
+            box-shadow: 0 0 12px rgba(0,255,204,0.3);
+        }
+        .btn-start:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-stop {
+            background: rgba(255,60,60,0.1);
+            border-color: #ff3c3c;
+            color: #ff3c3c;
+        }
+        .btn-stop:hover {
+            background: rgba(255,60,60,0.2);
+            box-shadow: 0 0 12px rgba(255,60,60,0.3);
+        }
+
+        .btn-clear {
+            background: rgba(120,120,150,0.1);
+            border-color: var(--muted);
+            color: var(--muted);
+        }
+        .btn-clear:hover {
+            background: rgba(120,120,150,0.2);
+            border-color: var(--text);
+            color: var(--text);
+        }
+
+        .btn-capture {
+            background: rgba(0,200,255,0.1);
+            border-color: #00c8ff;
+            color: #00c8ff;
+        }
+        .btn-capture:hover {
+            background: rgba(0,200,255,0.2);
+            box-shadow: 0 0 12px rgba(0,200,255,0.3);
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10,10,15,0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--dim);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .loading-sub {
+            margin-top: 8px;
+            font-size: 0.7rem;
+            color: var(--muted);
+        }
+
+        /* Threshold slider */
+        .threshold-control {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 16px 0;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: 6px;
+        }
+
+        .threshold-control label {
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        .threshold-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        input[type=range] {
+            accent-color: var(--accent);
+            flex: 1;
+        }
+
+        #thresholdValue {
+            color: var(--accent);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            min-width: 40px;
+        }
+
+        /* Protocol info */
+        .protocol-info {
+            margin-top: 20px;
+            padding: 12px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.65rem;
+            color: var(--muted);
+        }
+
+        .protocol-info h3 {
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .protocol-info ul {
+            margin-left: 20px;
+        }
+
+        .protocol-info li {
+            margin: 4px 0;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading OpenCV.js...</div>
+        <div class="loading-sub">This may take a few seconds</div>
+    </div>
+
+    <h1>LIGHT KEY RECEIVER</h1>
+    <p class="subtitle">OpenCV.js 4-Bit Optical Decoder</p>
+
+    <div class="container">
+        <!-- Camera Panel -->
+        <div class="panel">
+            <div class="panel-title">◈ CAMERA INPUT</div>
+
+            <div class="video-container">
+                <video id="videoElement" autoplay playsinline></video>
+                <canvas id="overlay"></canvas>
+            </div>
+
+            <div class="threshold-control">
+                <label>Brightness Detection Threshold</label>
+                <div class="threshold-row">
+                    <input type="range" id="thresholdSlider" min="50" max="200" value="120">
+                    <span id="thresholdValue">120</span>
+                </div>
+            </div>
+
+            <div class="led-display">
+                <div class="led" id="led3">BIT3</div>
+                <div class="led" id="led2">BIT2</div>
+                <div class="led" id="led1">BIT1</div>
+                <div class="led" id="led0">BIT0</div>
+            </div>
+
+            <div class="status-display">
+                <div class="status-item">
+                    <div class="status-label">Detected</div>
+                    <div class="status-value" id="detectedValue">0000</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Brightness</div>
+                    <div class="status-value" id="brightnessValue">-</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Frame Rate</div>
+                    <div class="status-value" id="fpsValue">0</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Status</div>
+                    <div class="status-value" id="statusValue">IDLE</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-start" id="btnStart" onclick="startCamera()">▶ START CAMERA</button>
+                <button class="btn-stop" id="btnStop" onclick="stopCamera()" disabled>■ STOP</button>
+            </div>
+        </div>
+
+        <!-- Decoder Panel -->
+        <div class="panel">
+            <div class="panel-title">◈ DECODER OUTPUT</div>
+
+            <div class="message-display" id="messageDisplay">
+                <span style="color: var(--muted); font-size: 0.8rem;">Waiting for signal...</span>
+            </div>
+
+            <div class="status-display">
+                <div class="status-item">
+                    <div class="status-label">Current Char</div>
+                    <div class="status-value" id="rxChar">-</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Hex</div>
+                    <div class="status-value" id="rxHex">0x00</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Nibble</div>
+                    <div class="status-value" id="rxNibble">WAIT</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Count</div>
+                    <div class="status-value" id="rxCount">0</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-clear" onclick="clearReceiver()">🗑 CLEAR</button>
+                <button class="btn-clear" onclick="copyMessage()">📋 COPY</button>
+                <button class="btn-capture" onclick="captureReceiver()">📷 PNG</button>
+            </div>
+
+            <div class="protocol-info">
+                <h3>4-Bit Detection Protocol</h3>
+                <ul>
+                    <li>Camera detects 4 LED positions</li>
+                    <li>OpenCV processes brightness levels</li>
+                    <li>2 nibbles (HIGH→LOW) = 1 character</li>
+                    <li>Adjust threshold for your lighting</li>
+                    <li>Point camera at LED transmitter</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden canvas for OpenCV processing -->
+    <canvas id="processCanvas" style="display: none;"></canvas>
+
+    <script src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvLoaded()" onerror="onOpenCvError()"></script>
+
+    <script>
+        // OpenCV state
+        let cvReady = false;
+        let video = null;
+        let canvas = null;
+        let ctx = null;
+        let overlay = null;
+        let overlayCtx = null;
+        let processCanvas = null;
+        let processCtx = null;
+        let isProcessing = false;
+        let animationId = null;
+        let lastFrameTime = 0;
+        let frameCount = 0;
+        let fps = 0;
+
+        // Detection state
+        let brightnessThreshold = 120;
+        let ledPositions = [];
+        let currentNibble = 0;
+        
+        // Decode state
+        let rxHighNibble = null;
+        let receivedChars = [];
+        let lastNibbleTime = 0;
+        let nibbleTimeout = null;
+
+        // Corner marker positions for alignment detection
+        const CORNER_MARKERS = {
+            tl: { x: 0.1, y: 0.15, r: 0.08 },  // Top-left
+            tr: { x: 0.9, y: 0.15, r: 0.08 },  // Top-right
+            bl: { x: 0.1, y: 0.85, r: 0.08 }   // Bottom-left
+        };
+
+        // LED region positions (relative to detected corners)
+        let ledPositions = [];
+
+        function calculateLedPositions(corners) {
+            // Calculate LED positions based on corner markers
+            // LEDs are positioned horizontally between top-left and top-right corners
+            const tl = corners.tl;
+            const tr = corners.tr;
+            const bl = corners.bl;
+
+            // Calculate center line
+            const centerY = (tl.y + bl.y) / 2;
+            const width = tr.x - tl.x;
+
+            // 4 LEDs evenly spaced in the center
+            ledPositions = [
+                { x: tl.x + width * 0.20, y: centerY, w: 0.12, h: 0.25 },  // LED3
+                { x: tl.x + width * 0.38, y: centerY, w: 0.12, h: 0.25 },  // LED2
+                { x: tl.x + width * 0.56, y: centerY, w: 0.12, h: 0.25 },  // LED1
+                { x: tl.x + width * 0.74, y: centerY, w: 0.12, h: 0.25 }   // LED0
+            ];
+        }
+
+        function onOpenCvLoaded() {
+            cvReady = true;
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            console.log('OpenCV.js loaded successfully');
+        }
+
+        function onOpenCvError() {
+            document.querySelector('.loading-text').textContent = 'Failed to load OpenCV.js';
+            document.querySelector('.loading-sub').textContent = 'Check your internet connection';
+            console.error('Failed to load OpenCV.js');
+        }
+
+        async function startCamera() {
+            if (!cvReady) {
+                alert('OpenCV.js is still loading. Please wait...');
+                return;
+            }
+
+            try {
+                video = document.getElementById('videoElement');
+                canvas = document.getElementById('overlay');
+                ctx = canvas.getContext('2d');
+                processCanvas = document.getElementById('processCanvas');
+                processCtx = processCanvas.getContext('2d');
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'environment'
+                    }
+                });
+
+                video.srcObject = stream;
+                await new Promise(resolve => {
+                    video.onloadedmetadata = resolve;
+                });
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                processCanvas.width = video.videoWidth;
+                processCanvas.height = video.videoHeight;
+
+                document.getElementById('btnStart').disabled = true;
+                document.getElementById('btnStop').disabled = false;
+                document.getElementById('statusValue').textContent = 'DETECTING';
+
+                lastFrameTime = performance.now();
+                processFrame();
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                alert('Could not access camera. Please allow camera permission.');
+            }
+        }
+
+        function stopCamera() {
+            if (video && video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            isProcessing = false;
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+            document.getElementById('statusValue').textContent = 'STOPPED';
+            clearLeds();
+        }
+
+        function processFrame() {
+            if (!isProcessing && cvReady) {
+                isProcessing = true;
+
+                try {
+                    // Draw video to process canvas
+                    processCtx.drawImage(video, 0, 0, processCanvas.width, processCanvas.height);
+
+                    // Get image data for processing
+                    const imageData = processCtx.getImageData(0, 0, processCanvas.width, processCanvas.height);
+                    
+                    // Detect LEDs using OpenCV
+                    const ledStates = detectLeds(imageData);
+
+                    // Update display
+                    updateLedDisplay(ledStates);
+                    updateOverlay(ledStates);
+
+                    // Decode nibble
+                    const nibble = ledStatesToNibble(ledStates);
+                    document.getElementById('detectedValue').textContent = nibble.toString(2).padStart(4, '0');
+                    document.getElementById('brightnessValue').textContent = getAverageBrightness(imageData);
+
+                    // Process received data
+                    processReceivedNibble(nibble);
+
+                    // Calculate FPS
+                    const now = performance.now();
+                    frameCount++;
+                    if (now - lastFrameTime >= 1000) {
+                        fps = frameCount;
+                        frameCount = 0;
+                        lastFrameTime = now;
+                        document.getElementById('fpsValue').textContent = fps;
+                    }
+                } catch (err) {
+                    console.error('Error processing frame:', err);
+                }
+
+                isProcessing = false;
+            }
+
+            animationId = requestAnimationFrame(processFrame);
+        }
+
+        function detectLeds(imageData) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            const ledStates = [0, 0, 0, 0];
+
+            // First, detect corner markers
+            const corners = detectCorners(imageData);
+            
+            // Calculate LED positions based on corners
+            calculateLedPositions(corners);
+
+            // Detect LEDs in calculated positions
+            for (let i = 0; i < 4; i++) {
+                const region = ledPositions[i];
+                const x1 = Math.floor(region.x * width);
+                const y1 = Math.floor(region.y * height);
+                const x2 = Math.floor((region.x + region.w) * width);
+                const y2 = Math.floor((region.y + region.h) * height);
+
+                let totalBrightness = 0;
+                let pixelCount = 0;
+
+                // Sample pixels in the LED region
+                for (let y = y1; y < y2; y += 4) {
+                    for (let x = x1; x < x2; x += 4) {
+                        const idx = (y * width + x) * 4;
+                        // Calculate brightness (weighted for orange/yellow LEDs)
+                        const brightness = 0.3 * data[idx] + 0.59 * data[idx + 1] + 0.11 * data[idx + 2];
+                        totalBrightness += brightness;
+                        pixelCount++;
+                    }
+                }
+
+                const avgBrightness = totalBrightness / pixelCount;
+                ledStates[i] = avgBrightness > brightnessThreshold ? 1 : 0;
+            }
+
+            return ledStates;
+        }
+
+        function detectCorners(imageData) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            const corners = { tl: null, tr: null, bl: null };
+
+            // Detect cyan corner markers by color
+            for (const [name, marker] of Object.entries(CORNER_MARKERS)) {
+                const cx = Math.floor(marker.x * width);
+                const cy = Math.floor(marker.y * height);
+                const radius = Math.floor(marker.r * Math.min(width, height));
+
+                let cyanCount = 0;
+                let totalPoints = 0;
+
+                // Sample points in a circle around the expected center
+                for (let angle = 0; angle < Math.PI * 2; angle += 0.2) {
+                    for (let r = radius * 0.5; r < radius * 1.2; r += 2) {
+                        const x = Math.floor(cx + Math.cos(angle) * r);
+                        const y = Math.floor(cy + Math.sin(angle) * r);
+
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            const idx = (y * width + x) * 4;
+                            const r_val = data[idx];
+                            const g_val = data[idx + 1];
+                            const b_val = data[idx + 2];
+
+                            // Detect cyan color (high G and B, low R)
+                            if (g_val > 150 && b_val > 150 && r_val < 100) {
+                                cyanCount++;
+                            }
+                            totalPoints++;
+                        }
+                    }
+                }
+
+                // If enough cyan pixels detected, mark corner as found
+                if (cyanCount > totalPoints * 0.3) {
+                    corners[name] = { x: marker.x, y: marker.y, r: marker.r };
+                } else {
+                    // Use default position if not detected
+                    corners[name] = marker;
+                }
+            }
+
+            return corners;
+        }
+
+        function getAverageBrightness(imageData) {
+            const data = imageData.data;
+            let total = 0;
+            const sampleSize = 100;
+            const step = Math.floor(data.length / 4 / sampleSize);
+
+            for (let i = 0; i < data.length; i += 4 * step) {
+                total += 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
+            }
+
+            return Math.round(total / sampleSize);
+        }
+
+        function ledStatesToNibble(ledStates) {
+            // LED3 is MSB, LED0 is LSB
+            return (ledStates[0] << 3) | (ledStates[1] << 2) | (ledStates[2] << 1) | ledStates[3];
+        }
+
+        function updateLedDisplay(ledStates) {
+            for (let i = 0; i < 4; i++) {
+                const led = document.getElementById(`led${3-i}`);
+                if (ledStates[i]) {
+                    led.classList.add('on');
+                } else {
+                    led.classList.remove('on');
+                }
+            }
+        }
+
+        function clearLeds() {
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`led${i}`).classList.remove('on');
+            }
+        }
+
+        function updateOverlay(ledStates) {
+            overlayCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Detect corners for overlay
+            const imageData = processCtx.getImageData(0, 0, canvas.width, canvas.height);
+            const corners = detectCorners(imageData);
+
+            // Draw corner markers
+            overlayCtx.strokeStyle = 'rgba(0, 255, 204, 0.8)';
+            overlayCtx.lineWidth = 3;
+            overlayCtx.setLineDash([5, 3]);
+
+            for (const [name, corner] of Object.entries(corners)) {
+                const x = corner.x * canvas.width;
+                const y = corner.y * canvas.height;
+                const r = corner.r * Math.min(canvas.width, canvas.height);
+
+                // Draw circle
+                overlayCtx.beginPath();
+                overlayCtx.arc(x, y, r, 0, Math.PI * 2);
+                overlayCtx.stroke();
+
+                // Label
+                overlayCtx.fillStyle = '#00ffcc';
+                overlayCtx.font = 'bold 12px Orbitron';
+                overlayCtx.textAlign = 'center';
+                const label = name === 'tl' ? 'TL' : name === 'tr' ? 'TR' : 'BL';
+                overlayCtx.fillText(label, x, y - r - 5);
+            }
+
+            overlayCtx.setLineDash([]);
+
+            // Draw LED regions
+            overlayCtx.strokeStyle = 'rgba(255, 107, 0, 0.6)';
+            overlayCtx.lineWidth = 2;
+
+            for (let i = 0; i < 4; i++) {
+                const region = ledPositions[i] || { x: 0.25 + i * 0.15, y: 0.5, w: 0.12, h: 0.25 };
+                const x = region.x * canvas.width;
+                const y = region.y * canvas.height;
+                const w = region.w * canvas.width;
+                const h = region.h * canvas.height;
+
+                overlayCtx.beginPath();
+                overlayCtx.arc(x + w/2, y + h/2, Math.min(w, h) / 2, 0, Math.PI * 2);
+                overlayCtx.stroke();
+
+                // LED state color
+                overlayCtx.fillStyle = ledStates[i] ? '#ff6b00' : '#555566';
+                overlayCtx.font = 'bold 14px Orbitron';
+                overlayCtx.textAlign = 'center';
+                overlayCtx.fillText(`BIT${3-i}`, x + w/2, y + h/2 + 5);
+            }
+
+            // Draw connection lines
+            overlayCtx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
+            overlayCtx.lineWidth = 1;
+            overlayCtx.beginPath();
+            overlayCtx.moveTo(corners.tl.x * canvas.width, corners.tl.y * canvas.height);
+            overlayCtx.lineTo(corners.tr.x * canvas.width, corners.tr.y * canvas.height);
+            overlayCtx.lineTo(corners.bl.x * canvas.width, corners.bl.y * canvas.height);
+            overlayCtx.closePath();
+            overlayCtx.stroke();
+        }
+
+        function processReceivedNibble(nibble) {
+            const now = Date.now();
+
+            // Clear timeout if nibble changed
+            if (nibbleTimeout && nibble !== currentNibble) {
+                clearTimeout(nibbleTimeout);
+            }
+
+            currentNibble = nibble;
+
+            // Set timeout to process nibble after stability
+            nibbleTimeout = setTimeout(() => {
+                if (rxHighNibble === null) {
+                    // First nibble (HIGH)
+                    rxHighNibble = nibble;
+                    document.getElementById('rxNibble').textContent = 'HIGH →';
+                    document.getElementById('rxHex').textContent = `0x${nibble.toString(16).toUpperCase()}`;
+                    document.getElementById('statusValue').textContent = 'RECEIVING';
+                } else {
+                    // Second nibble (LOW) - complete character
+                    const charCode = (rxHighNibble << 4) | nibble;
+                    const char = String.fromCharCode(charCode);
+
+                    // Validate character (printable ASCII)
+                    if (charCode >= 32 && charCode <= 126) {
+                        addReceivedChar(char, charCode);
+                    }
+
+                    rxHighNibble = null;
+                    document.getElementById('rxNibble').textContent = 'COMPLETE';
+                    document.getElementById('statusValue').textContent = 'DETECTED';
+                }
+
+                lastNibbleTime = now;
+            }, 100); // 100ms stability check
+        }
+
+        function addReceivedChar(char, charCode) {
+            receivedChars.push({ char, code: charCode });
+
+            const display = document.getElementById('messageDisplay');
+
+            if (receivedChars.length === 1) {
+                display.innerHTML = '';
+            }
+
+            const charBox = document.createElement('div');
+            charBox.className = 'char-box active';
+            const hex = charCode.toString(16).toUpperCase().padStart(2, '0');
+            charBox.innerHTML = `${char === ' ' ? '·' : char}<span class="hex">0x${hex}</span>`;
+            display.appendChild(charBox);
+
+            // Mark previous as received
+            const prevBoxes = display.querySelectorAll('.char-box.active');
+            if (prevBoxes.length > 1) {
+                prevBoxes[0].classList.remove('active');
+                prevBoxes[0].classList.add('received');
+            }
+
+            // Update stats
+            document.getElementById('rxChar').textContent = char === ' ' ? 'SPC' : char;
+            document.getElementById('rxHex').textContent = `0x${hex}`;
+            document.getElementById('rxCount').textContent = receivedChars.length;
+        }
+
+        function clearReceiver() {
+            receivedChars = [];
+            rxHighNibble = null;
+            document.getElementById('messageDisplay').innerHTML = '<span style="color: var(--muted); font-size: 0.8rem;">Waiting for signal...</span>';
+            document.getElementById('rxChar').textContent = '-';
+            document.getElementById('rxHex').textContent = '0x00';
+            document.getElementById('rxNibble').textContent = 'WAIT';
+            document.getElementById('rxCount').textContent = '0';
+            document.getElementById('statusValue').textContent = isProcessing ? 'DETECTING' : 'IDLE';
+        }
+
+        function copyMessage() {
+            const message = receivedChars.map(c => c.char).join('');
+            if (message) {
+                navigator.clipboard.writeText(message).then(() => {
+                    alert('Message copied to clipboard!');
+                });
+            }
+        }
+
+        function captureReceiver() {
+            const panel = document.querySelector('.panel:last-child');
+            const canvas = document.createElement('canvas');
+            const rect = panel.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.scale(2, 2);
+            
+            // Background
+            ctx.fillStyle = '#111118';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            
+            // Draw video frame if available
+            if (video && !video.paused) {
+                try {
+                    ctx.drawImage(video, 20, 20, rect.width - 40, 240);
+                    
+                    // Draw corner detection overlay
+                    ctx.strokeStyle = 'rgba(0, 255, 204, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 3]);
+                    
+                    const corners = [
+                        { x: 0.1 * (rect.width - 40) + 20, y: 0.15 * 240 + 20 },
+                        { x: 0.9 * (rect.width - 40) + 20, y: 0.15 * 240 + 20 },
+                        { x: 0.1 * (rect.width - 40) + 20, y: 0.85 * 240 + 20 }
+                    ];
+                    
+                    corners.forEach((c, i) => {
+                        ctx.beginPath();
+                        ctx.arc(c.x, c.y, 20, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.fillStyle = '#00ffcc';
+                        ctx.font = 'bold 12px Orbitron';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(['TL', 'TR', 'BL'][i], c.x, c.y - 25);
+                    });
+                    
+                    ctx.setLineDash([]);
+                } catch (e) {
+                    console.log('Could not draw video frame');
+                }
+            }
+            
+            // Draw LED display
+            const ledDisplay = panel.querySelector('.led-display');
+            if (ledDisplay) {
+                const ledRect = ledDisplay.getBoundingClientRect();
+                const lx = 20;
+                const ly = 280;
+                
+                const leds = ledDisplay.querySelectorAll('.led');
+                leds.forEach((led, i) => {
+                    const lx_pos = lx + i * 70 + 35;
+                    const ly_pos = ly + 30;
+                    
+                    ctx.beginPath();
+                    ctx.arc(lx_pos, ly_pos, 30, 0, Math.PI * 2);
+                    
+                    if (led.classList.contains('on')) {
+                        const gradient = ctx.createRadialGradient(lx_pos, ly_pos, 0, lx_pos, ly_pos, 30);
+                        gradient.addColorStop(0, '#ffffff');
+                        gradient.addColorStop(0.25, '#ffdd44');
+                        gradient.addColorStop(0.6, '#ff8800');
+                        gradient.addColorStop(1, 'rgba(255,80,0,0)');
+                        ctx.fillStyle = gradient;
+                        ctx.shadowColor = '#ff6b00';
+                        ctx.shadowBlur = 28;
+                    } else {
+                        ctx.fillStyle = '#1a1a28';
+                        ctx.shadowBlur = 0;
+                    }
+                    ctx.fill();
+                    ctx.strokeStyle = led.classList.contains('on') ? 'rgba(255,150,0,0.6)' : '#2a2a3a';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                });
+            }
+            
+            // Draw received message
+            const msgDisplay = panel.querySelector('.message-display');
+            if (msgDisplay) {
+                const mx = 20;
+                const my = 400;
+                
+                ctx.fillStyle = '#0a0a0f';
+                ctx.strokeStyle = '#1e1e2e';
+                ctx.lineWidth = 1;
+                ctx.fillRect(mx, my, rect.width - 40, 80);
+                ctx.strokeRect(mx, my, rect.width - 40, 80);
+                
+                const charBoxes = msgDisplay.querySelectorAll('.char-box');
+                charBoxes.forEach((box, i) => {
+                    const bx = mx + 30 + i * 50;
+                    const by = my + 15;
+                    
+                    ctx.fillStyle = box.classList.contains('received') ? 'rgba(0,255,204,0.08)' :
+                                   box.classList.contains('active') ? 'rgba(255,107,0,0.12)' : '#111118';
+                    ctx.fillRect(bx, by, 40, 50);
+                    
+                    ctx.strokeStyle = box.classList.contains('received') ? '#00ffcc' :
+                                     box.classList.contains('active') ? '#ff6b00' : '#2a2a3a';
+                    ctx.strokeRect(bx, by, 40, 50);
+                    
+                    const text = box.childNodes[0]?.textContent || '';
+                    ctx.fillStyle = box.classList.contains('received') ? '#00ffcc' :
+                                   box.classList.contains('active') ? '#ff6b00' : '#555566';
+                    ctx.font = 'bold 22px Orbitron';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(text, bx + 20, by + 33);
+                });
+            }
+            
+            // Draw status
+            ctx.fillStyle = '#00ffcc';
+            ctx.font = 'bold 14px Orbitron';
+            ctx.textAlign = 'left';
+            ctx.fillText(`DETECTED: ${receivedChars.length} chars`, 30, 520);
+            ctx.fillText(`FPS: ${fps}`, 200, 520);
+            
+            downloadCanvas(canvas, 'light-key-receiver-capture');
+        }
+
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = `${filename}-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // Threshold slider
+        document.getElementById('thresholdSlider').addEventListener('input', (e) => {
+            brightnessThreshold = parseInt(e.target.value);
+            document.getElementById('thresholdValue').textContent = brightnessThreshold;
+        });
+
+        // Initialize
+        document.getElementById('thresholdValue').textContent = brightnessThreshold;
+    </script>
+</body>
+</html>

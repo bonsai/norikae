@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Light Key Transceiver - 4-Bit Optical Communication</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --bg: #0a0a0f;
+            --panel: #111118;
+            --border: #1e1e2e;
+            --accent: #00ffcc;
+            --accent2: #ff6b00;
+            --dim: #2a2a3a;
+            --text: #c8c8d8;
+            --muted: #555566;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 16px;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,204,0.015) 2px, rgba(0,255,204,0.015) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,255,204,0.008) 2px, rgba(0,255,204,0.008) 4px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1rem, 3vw, 1.4rem);
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: var(--accent);
+            text-shadow: 0 0 20px rgba(0,255,204,0.5);
+            margin-bottom: 6px;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            margin-bottom: 20px;
+            z-index: 1;
+        }
+
+        .container {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+            z-index: 1;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            flex: 1;
+            min-width: 400px;
+            max-width: 580px;
+        }
+
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 16px;
+            text-align: center;
+            letter-spacing: 0.1em;
+        }
+
+        /* Input area */
+        .input-area {
+            margin-bottom: 16px;
+        }
+
+        .input-area label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        #messageInput {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+            padding: 10px 14px;
+        }
+
+        #messageInput:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* LED Display */
+        .led-display {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 20px;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .led {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #1a1a28;
+            border: 2px solid var(--dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            color: var(--muted);
+            transition: all 0.1s;
+        }
+
+        .led.on {
+            background: radial-gradient(circle at 30% 30%, #ffffff, #ffdd44 25%, #ff8800 60%, rgba(255,80,0,0) 70%);
+            border-color: var(--accent2);
+            color: #fff;
+            box-shadow: 0 0 30px rgba(255,107,0,0.8), 0 0 60px rgba(255,107,0,0.4);
+        }
+
+        /* Corner markers for alignment */
+        .corner-marker {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 3px solid #00ffcc;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,255,204,0.8), 0 0 20px rgba(0,255,204,0.4);
+            background: rgba(0, 255, 204, 0.3);
+        }
+
+        .corner-tl { top: 10px; left: 10px; }
+        .corner-tr { top: 10px; right: 10px; }
+        .corner-bl { bottom: 10px; left: 10px; }
+
+        /* LED Display container */
+        .led-container {
+            position: relative;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .led-display {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        /* Received message display */
+        .message-display {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px;
+            min-height: 60px;
+            margin: 16px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .char-box {
+            width: 40px;
+            height: 50px;
+            border: 1px solid var(--dim);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--muted);
+            background: var(--panel);
+            transition: all 0.2s;
+        }
+
+        .char-box.active {
+            border-color: var(--accent2);
+            color: var(--accent2);
+            background: rgba(255,107,0,0.12);
+            box-shadow: 0 0 12px rgba(255,107,0,0.4);
+        }
+
+        .char-box.received {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(0,255,204,0.08);
+        }
+
+        .char-box .hex {
+            font-size: 0.5rem;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .char-box.active .hex, .char-box.received .hex {
+            color: rgba(0,255,204,0.6);
+        }
+
+        /* Status display */
+        .status-display {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .status-item {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 0.6rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .status-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-top: 4px;
+        }
+
+        /* Bit indicator */
+        .bit-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin: 12px 0;
+        }
+
+        .bit-box {
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--dim);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--muted);
+            background: var(--bg);
+            transition: all 0.1s;
+        }
+
+        .bit-box.on {
+            background: var(--accent2);
+            border-color: var(--accent2);
+            color: #fff;
+            box-shadow: 0 0 10px rgba(255,107,0,0.6);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-transform: uppercase;
+        }
+
+        .btn-transmit {
+            background: rgba(0,255,204,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn-transmit:hover {
+            background: rgba(0,255,204,0.2);
+            box-shadow: 0 0 12px rgba(0,255,204,0.3);
+        }
+        .btn-transmit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-capture {
+            background: rgba(0,200,255,0.1);
+            border-color: #00c8ff;
+            color: #00c8ff;
+        }
+        .btn-capture:hover {
+            background: rgba(0,200,255,0.2);
+            box-shadow: 0 0 12px rgba(0,200,255,0.3);
+        }
+
+        .btn-clear {
+            background: rgba(120,120,150,0.1);
+            border-color: var(--muted);
+            color: var(--muted);
+        }
+        .btn-clear:hover {
+            background: rgba(120,120,150,0.2);
+            border-color: var(--text);
+            color: var(--text);
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            color: var(--muted);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 14px;
+        }
+
+        input[type=range] {
+            accent-color: var(--accent);
+            width: 80px;
+        }
+
+        #speedValue {
+            color: var(--accent);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            min-width: 50px;
+        }
+
+        /* Protocol info */
+        .protocol-info {
+            margin-top: 20px;
+            padding: 12px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.65rem;
+            color: var(--muted);
+        }
+
+        .protocol-info h3 {
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .protocol-info ul {
+            margin-left: 20px;
+        }
+
+        .protocol-info li {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>LIGHT KEY TRANSCEIVER</h1>
+    <p class="subtitle">4-Bit Optical Communication (2 frames per character)</p>
+
+    <div class="container">
+        <!-- Transmitter Panel -->
+        <div class="panel">
+            <div class="panel-title">◈ TRANSMITTER</div>
+            
+            <div class="input-area">
+                <label>Message to Send</label>
+                <input type="text" id="messageInput" value="HELLO WORLD!" maxlength="32">
+            </div>
+
+            <div class="led-container">
+                <div class="corner-marker corner-tl"></div>
+                <div class="corner-marker corner-tr"></div>
+                <div class="corner-marker corner-bl"></div>
+                <div class="led-display">
+                    <div class="led" id="led3">BIT3</div>
+                    <div class="led" id="led2">BIT2</div>
+                    <div class="led" id="led1">BIT1</div>
+                    <div class="led" id="led0">BIT0</div>
+                </div>
+            </div>
+
+            <div class="bit-indicator">
+                <div class="bit-box" id="bit3">1</div>
+                <div class="bit-box" id="bit2">2</div>
+                <div class="bit-box" id="bit1">4</div>
+                <div class="bit-box" id="bit0">8</div>
+            </div>
+
+            <div class="status-display">
+                <div class="status-item">
+                    <div class="status-label">Current Char</div>
+                    <div class="status-value" id="txChar">-</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Hex Value</div>
+                    <div class="status-value" id="txHex">0x00</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Nibble</div>
+                    <div class="status-value" id="txNibble">HIGH</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Progress</div>
+                    <div class="status-value" id="txProgress">0/0</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-transmit" id="btnTransmit" onclick="startTransmit()">▶ TRANSMIT</button>
+                <button class="btn-clear" onclick="resetTransmit()">↺ RESET</button>
+                <button class="btn-capture" onclick="captureTransmitter()">📷 PNG</button>
+                <div class="speed-control">
+                    SPEED
+                    <input type="range" id="speedRange" min="1" max="10" value="2" oninput="updateSpeed()">
+                    <span id="speedValue">0.5s/char</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Receiver Panel -->
+        <div class="panel">
+            <div class="panel-title">◈ RECEIVER</div>
+
+            <div class="message-display" id="messageDisplay">
+                <span style="color: var(--muted); font-size: 0.8rem;">Waiting for signal...</span>
+            </div>
+
+            <div class="status-display">
+                <div class="status-item">
+                    <div class="status-label">Received</div>
+                    <div class="status-value" id="rxChar">-</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Hex</div>
+                    <div class="status-value" id="rxHex">0x00</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Nibble</div>
+                    <div class="status-value" id="rxNibble">WAIT</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Count</div>
+                    <div class="status-value" id="rxCount">0</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-clear" onclick="clearReceiver()">🗑 CLEAR</button>
+                <button class="btn-capture" onclick="captureReceiver()">📷 PNG</button>
+            </div>
+
+            <div class="protocol-info">
+                <h3>4-Bit Protocol</h3>
+                <ul>
+                    <li>Each character = 1 byte (8 bits)</li>
+                    <li>Transmitted as 2 × 4-bit nibbles</li>
+                    <li>First: HIGH nibble (bits 7-4)</li>
+                    <li>Second: LOW nibble (bits 3-0)</li>
+                    <li>Default: "HELLO WORLD!" at 0.5s/char</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        let charDuration = 500; // ms per character (0.5s default)
+        let frameDuration = 250; // ms per nibble (half of char duration)
+        
+        // State
+        let message = "HELLO WORLD!";
+        let charIndex = 0;
+        let nibbleIndex = 0; // 0 = HIGH, 1 = LOW
+        let isTransmitting = false;
+        let timerId = null;
+        
+        // Received data
+        let receivedChars = [];
+        let rxHighNibble = null;
+
+        // Initialize
+        function init() {
+            message = document.getElementById('messageInput').value;
+            updateSpeed();
+        }
+
+        function updateSpeed() {
+            const speed = parseInt(document.getElementById('speedRange').value);
+            // Speed 1 = 1s/char, Speed 10 = 0.1s/char
+            charDuration = 1000 / speed;
+            frameDuration = charDuration / 2;
+            
+            document.getElementById('speedValue').textContent = `${(charDuration/1000).toFixed(1)}s/char`;
+            
+            if (isTransmitting) {
+                clearTimeout(timerId);
+                scheduleNext();
+            }
+        }
+
+        function setLeds(value) {
+            // value is 4 bits (0-15)
+            for (let i = 0; i < 4; i++) {
+                const bit = (value >> i) & 1;
+                const led = document.getElementById(`led${3-i}`);
+                const bitBox = document.getElementById(`bit${3-i}`);
+                
+                if (bit) {
+                    led.classList.add('on');
+                    bitBox.classList.add('on');
+                } else {
+                    led.classList.remove('on');
+                    bitBox.classList.remove('on');
+                }
+            }
+        }
+
+        function clearLeds() {
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`led${i}`).classList.remove('on');
+                document.getElementById(`bit${i}`).classList.remove('on');
+            }
+        }
+
+        function startTransmit() {
+            if (isTransmitting) return;
+            
+            message = document.getElementById('messageInput').value;
+            if (!message) {
+                message = "HELLO WORLD!";
+                document.getElementById('messageInput').value = message;
+            }
+            
+            isTransmitting = true;
+            charIndex = 0;
+            nibbleIndex = 0;
+            
+            document.getElementById('btnTransmit').disabled = true;
+            
+            transmitNext();
+        }
+
+        function transmitNext() {
+            if (charIndex >= message.length) {
+                // Transmission complete
+                isTransmitting = false;
+                document.getElementById('btnTransmit').disabled = false;
+                clearLeds();
+                return;
+            }
+
+            const char = message[charIndex];
+            const charCode = char.charCodeAt(0);
+            
+            // Get current nibble
+            const nibble = nibbleIndex === 0 ? (charCode >> 4) : (charCode & 0x0F);
+            
+            // Update transmitter display
+            setLeds(nibble);
+            document.getElementById('txChar').textContent = char === ' ' ? 'SPC' : char;
+            document.getElementById('txHex').textContent = `0x${charCode.toString(16).toUpperCase().padStart(2, '0')}`;
+            document.getElementById('txNibble').textContent = nibbleIndex === 0 ? 'HIGH' : 'LOW';
+            document.getElementById('txProgress').textContent = `${charIndex + 1}/${message.length}`;
+
+            // Simulate receiver getting the data
+            receiveNibble(nibble, char, charCode);
+
+            // Schedule next
+            scheduleNext();
+        }
+
+        function receiveNibble(nibble, char, charCode) {
+            if (nibbleIndex === 0) {
+                // Store high nibble
+                rxHighNibble = nibble;
+                document.getElementById('rxNibble').textContent = 'HIGH →';
+                document.getElementById('rxHex').textContent = `0x${nibble.toString(16).toUpperCase()}`;
+            } else {
+                // Combine with high nibble to get full byte
+                const receivedCode = (rxHighNibble << 4) | nibble;
+                const receivedChar = String.fromCharCode(receivedCode);
+                
+                // Update receiver display
+                document.getElementById('rxChar').textContent = receivedChar === ' ' ? 'SPC' : receivedChar;
+                document.getElementById('rxHex').textContent = `0x${receivedCode.toString(16).toUpperCase().padStart(2, '0')}`;
+                document.getElementById('rxNibble').textContent = 'COMPLETE';
+                document.getElementById('rxCount').textContent = receivedChars.length + 1;
+                
+                // Add to received message
+                addReceivedChar(receivedChar, charCode);
+            }
+        }
+
+        function addReceivedChar(char, charCode) {
+            receivedChars.push({ char, code: charCode });
+            
+            const display = document.getElementById('messageDisplay');
+            
+            // Clear "waiting" message if first char
+            if (receivedChars.length === 1) {
+                display.innerHTML = '';
+            }
+            
+            const charBox = document.createElement('div');
+            charBox.className = 'char-box active';
+            const hex = charCode.toString(16).toUpperCase().padStart(2, '0');
+            charBox.innerHTML = `${char === ' ' ? '·' : char}<span class="hex">0x${hex}</span>`;
+            display.appendChild(charBox);
+            
+            // Mark previous as received
+            const prevBoxes = display.querySelectorAll('.char-box.active');
+            if (prevBoxes.length > 1) {
+                prevBoxes[0].classList.remove('active');
+                prevBoxes[0].classList.add('received');
+            }
+        }
+
+        function scheduleNext() {
+            timerId = setTimeout(() => {
+                nibbleIndex++;
+                if (nibbleIndex > 1) {
+                    nibbleIndex = 0;
+                    charIndex++;
+                }
+                transmitNext();
+            }, frameDuration);
+        }
+
+        function resetTransmit() {
+            clearTimeout(timerId);
+            isTransmitting = false;
+            charIndex = 0;
+            nibbleIndex = 0;
+            rxHighNibble = null;
+            
+            clearLeds();
+            document.getElementById('btnTransmit').disabled = false;
+            document.getElementById('txChar').textContent = '-';
+            document.getElementById('txHex').textContent = '0x00';
+            document.getElementById('txNibble').textContent = 'HIGH';
+            document.getElementById('txProgress').textContent = '0/0';
+        }
+
+        function clearReceiver() {
+            receivedChars = [];
+            rxHighNibble = null;
+            document.getElementById('messageDisplay').innerHTML = '<span style="color: var(--muted); font-size: 0.8rem;">Waiting for signal...</span>';
+            document.getElementById('rxChar').textContent = '-';
+            document.getElementById('rxHex').textContent = '0x00';
+            document.getElementById('rxNibble').textContent = 'WAIT';
+            document.getElementById('rxCount').textContent = '0';
+        }
+
+        function captureTransmitter() {
+            const panel = document.querySelector('.panel:first-child');
+            const canvas = document.createElement('canvas');
+            const rect = panel.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            const ctx = canvas.getContext('2d');
+            
+            // Scale for high DPI
+            ctx.scale(2, 2);
+            
+            // Background
+            ctx.fillStyle = '#111118';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            
+            // Draw LED display
+            const ledContainer = panel.querySelector('.led-container');
+            const ledRect = ledContainer.getBoundingClientRect();
+            const relX = ledRect.left - rect.left;
+            const relY = ledRect.top - rect.top;
+            
+            // Corner markers
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 3;
+            ctx.fillStyle = 'rgba(0, 255, 204, 0.3)';
+            
+            const corners = [
+                { x: relX + 20, y: relY + 20 },
+                { x: relX + ledRect.width - 20, y: relY + 20 },
+                { x: relX + 20, y: relY + ledRect.height - 20 }
+            ];
+            
+            corners.forEach(c => {
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+            
+            // LEDs
+            const leds = panel.querySelectorAll('.led');
+            leds.forEach((led, i) => {
+                const ledBox = led.getBoundingClientRect();
+                const lx = relX + (ledBox.left - ledContainer.getBoundingClientRect().left) + ledBox.width / 2;
+                const ly = relY + (ledBox.top - ledContainer.getBoundingClientRect().top) + ledBox.height / 2;
+                
+                ctx.beginPath();
+                ctx.arc(lx, ly, 30, 0, Math.PI * 2);
+                
+                if (led.classList.contains('on')) {
+                    const gradient = ctx.createRadialGradient(lx, ly, 0, lx, ly, 30);
+                    gradient.addColorStop(0, '#ffffff');
+                    gradient.addColorStop(0.25, '#ffdd44');
+                    gradient.addColorStop(0.6, '#ff8800');
+                    gradient.addColorStop(1, 'rgba(255,80,0,0)');
+                    ctx.fillStyle = gradient;
+                    ctx.shadowColor = '#ff6b00';
+                    ctx.shadowBlur = 28;
+                } else {
+                    ctx.fillStyle = '#1a1a28';
+                    ctx.shadowBlur = 0;
+                }
+                ctx.fill();
+                ctx.strokeStyle = led.classList.contains('on') ? 'rgba(255,150,0,0.6)' : '#2a2a3a';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            });
+            
+            // Download
+            downloadCanvas(canvas, 'light-key-transmitter');
+        }
+
+        function captureReceiver() {
+            const panel = document.querySelector('.panel:last-child');
+            const canvas = document.createElement('canvas');
+            const rect = panel.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.scale(2, 2);
+            
+            // Background
+            ctx.fillStyle = '#111118';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            
+            // Draw received message
+            const msgDisplay = panel.querySelector('.message-display');
+            const msgRect = msgDisplay.getBoundingClientRect();
+            const relX = msgRect.left - rect.left;
+            const relY = msgRect.top - rect.top;
+            
+            ctx.fillStyle = '#0a0a0f';
+            ctx.strokeStyle = '#1e1e2e';
+            ctx.lineWidth = 1;
+            ctx.fillRect(relX, relY, msgRect.width, msgRect.height);
+            ctx.strokeRect(relX, relY, msgRect.width, msgRect.height);
+            
+            // Draw char boxes
+            const charBoxes = msgDisplay.querySelectorAll('.char-box');
+            charBoxes.forEach((box, i) => {
+                const boxRect = box.getBoundingClientRect();
+                const bx = relX + (boxRect.left - msgRect.left);
+                const by = relY + (boxRect.top - msgRect.top);
+                
+                ctx.fillStyle = box.classList.contains('received') ? 'rgba(0,255,204,0.08)' :
+                               box.classList.contains('active') ? 'rgba(255,107,0,0.12)' : '#111118';
+                ctx.fillRect(bx, by, boxRect.width, boxRect.height);
+                
+                ctx.strokeStyle = box.classList.contains('received') ? '#00ffcc' :
+                                 box.classList.contains('active') ? '#ff6b00' : '#2a2a3a';
+                ctx.strokeRect(bx, by, boxRect.width, boxRect.height);
+                
+                // Text
+                const text = box.childNodes[0]?.textContent || '';
+                ctx.fillStyle = box.classList.contains('received') ? '#00ffcc' :
+                               box.classList.contains('active') ? '#ff6b00' : '#555566';
+                ctx.font = 'bold 22px Orbitron';
+                ctx.textAlign = 'center';
+                ctx.fillText(text, bx + boxRect.width / 2, by + 28);
+            });
+            
+            downloadCanvas(canvas, 'light-key-receiver');
+        }
+
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = `${filename}-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // Input change handler
+        document.getElementById('messageInput').addEventListener('input', (e) => {
+            if (!isTransmitting) {
+                message = e.target.value || "HELLO WORLD!";
+            }
+        });
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

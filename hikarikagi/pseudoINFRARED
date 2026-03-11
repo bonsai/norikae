@@ -1,0 +1,89 @@
+4. 結論：どう実装すべきか
+「赤外線だけでテキストを送る」という目的を達成するための最強の構成はこれです：
+
+スマホ（送信）: 画面上で「赤色（R）」をフルパワーで点滅させる。
+
+物理フィルタ: スマホの画面の上に、「IR76」や「IR80」といった赤外線透過フィルターのシートを置く。これで可視光が消え、人間には真っ暗に見えます。
+
+UIAP（受信）: センサーに「赤外線フォトトランジスタ（波長940nm付近にピークがあるもの）」を使う。
+
+ポイント: 赤外線FTはスマホの漏れ出す赤外線に非常に敏感です。UIAPのADCで差分をとれば、周囲にバレずにテキストデータを秒間数十ビットの速度で送れます。
+
+この「ステルス光通信」こそ、まさに**「スパイの鍵」のようなガジェット感がありますね。
+UIAP側のコードで、この「微弱な変化をノイズから抽出するデジタルフィルタ（移動平均など）」**の書き方を深掘りしましょうか？
+
+
+
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Stealth IR-Mode Simulation</title>
+    <style>
+        body { background: #000; color: #333; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        
+        /* 送信部：人間の目にはほとんど見えない暗い赤 */
+        #tx-panel {
+            width: 200px; height: 200px;
+            background: #020000; /* 超低輝度。ほぼ黒 */
+            border: 1px solid #111;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* 受信ログ：UIAPの内部処理（高感度モード） */
+        #rx-log {
+            margin-top: 20px; width: 300px; height: 150px;
+            background: #050505; color: #0f0; border: 1px solid #222;
+            padding: 10px; font-size: 12px; overflow-y: auto;
+        }
+
+        .status { color: #555; font-size: 11px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="status">送信パネル（スマホ画面を想定）: タップで"HELLO"を送信</div>
+<div id="tx-panel" onclick="sendStealthText()"></div>
+
+<div id="rx-log"></div>
+<div class="status">UIAP High-Gain Monitor (微分解析中)</div>
+
+<script>
+    const log = document.getElementById('rx-log');
+    const panel = document.getElementById('tx-panel');
+    const secretMessage = "HELLO";
+
+    function addLog(msg) {
+        const div = document.createElement('div');
+        div.textContent = `[UIAP_ADC] ${msg}`;
+        log.prepend(div);
+    }
+
+    // ステルス送信（超低輝度パルス）
+    async function sendStealthText() {
+        addLog("検知開始: 超低輝度モード...");
+        for (let char of secretMessage) {
+            const code = char.charCodeAt(0);
+            for (let i = 0; i < 8; i++) {
+                const bit = (code >> (7 - i)) & 1;
+                
+                // 人間の目には判別できない #080000 (ON) と #000000 (OFF) の切り替え
+                panel.style.background = bit ? "#080000" : "#000000";
+                
+                // UIAP側の高感度差分検知をエミュレート
+                if (bit) {
+                    addLog(`微弱パルス検知: Bit ${7-i}`);
+                }
+                
+                await new Promise(r => setTimeout(r, 100));
+            }
+            addLog(`文字デコード完了: ${char}`, true);
+            panel.style.background = "#000000";
+            await new Promise(r => setTimeout(r, 200));
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Light Key (光の鍵) - 4-Bit Optical Communication</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+        :root {
+            --bg: #0a0a0f;
+            --panel: #111118;
+            --border: #1e1e2e;
+            --accent: #00ffcc;
+            --accent2: #ff6b00;
+            --dim: #2a2a3a;
+            --text: #c8c8d8;
+            --muted: #555566;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 16px;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,204,0.015) 2px, rgba(0,255,204,0.015) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,255,204,0.008) 2px, rgba(0,255,204,0.008) 4px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1rem, 3vw, 1.4rem);
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: var(--accent);
+            text-shadow: 0 0 20px rgba(0,255,204,0.5);
+            margin-bottom: 6px;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+            margin-bottom: 20px;
+            z-index: 1;
+        }
+
+        /* Message bar */
+        .message-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        .char-cell {
+            width: 36px;
+            height: 40px;
+            border: 1px solid var(--dim);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--muted);
+            background: var(--panel);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .char-cell.sent {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(0,255,204,0.08);
+        }
+
+        .char-cell.active {
+            border-color: var(--accent2);
+            color: var(--accent2);
+            background: rgba(255,107,0,0.12);
+            box-shadow: 0 0 12px rgba(255,107,0,0.4);
+            animation: pulse-cell 0.5s ease-in-out infinite alternate;
+        }
+
+        .char-cell .hex {
+            font-size: 0.5rem;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .char-cell.active .hex { color: rgba(255,107,0,0.7); }
+        .char-cell.sent .hex { color: rgba(0,255,204,0.6); }
+
+        @keyframes pulse-cell {
+            from { box-shadow: 0 0 8px rgba(255,107,0,0.3); }
+            to   { box-shadow: 0 0 18px rgba(255,107,0,0.7); }
+        }
+
+        /* Canvas wrapper */
+        .canvas-wrap {
+            position: relative;
+            z-index: 1;
+        }
+
+        canvas {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            display: block;
+        }
+
+        /* Status row */
+        .status-row {
+            display: flex;
+            gap: 24px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        .stat-box {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 18px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.6rem;
+            color: var(--muted);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .stat-value.accent { color: var(--accent); }
+        .stat-value.accent2 { color: var(--accent2); }
+        .stat-value.white { color: #fff; }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 18px;
+            z-index: 1;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+
+        button {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            padding: 9px 20px;
+            border-radius: 4px;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-transform: uppercase;
+        }
+
+        .btn-start {
+            background: rgba(0,255,204,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn-start:hover {
+            background: rgba(0,255,204,0.2);
+            box-shadow: 0 0 12px rgba(0,255,204,0.3);
+        }
+
+        .btn-stop {
+            background: rgba(255,60,60,0.1);
+            border-color: #ff3c3c;
+            color: #ff3c3c;
+        }
+        .btn-stop:hover {
+            background: rgba(255,60,60,0.2);
+            box-shadow: 0 0 12px rgba(255,60,60,0.3);
+        }
+
+        .btn-reset {
+            background: rgba(120,120,150,0.1);
+            border-color: var(--muted);
+            color: var(--muted);
+        }
+        .btn-reset:hover {
+            background: rgba(120,120,150,0.2);
+            border-color: var(--text);
+            color: var(--text);
+        }
+
+        .speed-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            color: var(--muted);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 14px;
+        }
+
+        input[type=range] {
+            accent-color: var(--accent);
+            width: 80px;
+        }
+
+        #speedLabel {
+            color: var(--accent);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            min-width: 40px;
+        }
+
+        /* Nibble indicator */
+        .nibble-indicator {
+            margin-top: 12px;
+            font-size: 0.75rem;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+            z-index: 1;
+            height: 20px;
+        }
+
+        .bit-display {
+            display: inline-flex;
+            gap: 4px;
+            margin-left: 10px;
+        }
+
+        .bit {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            border: 1px solid var(--dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--muted);
+        }
+
+        .bit.on {
+            background: var(--accent2);
+            border-color: var(--accent2);
+            color: #fff;
+            box-shadow: 0 0 6px rgba(255,107,0,0.5);
+        }
+
+        .done-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(10,10,15,0.85);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 900;
+            color: var(--accent);
+            letter-spacing: 0.2em;
+            text-shadow: 0 0 30px rgba(0,255,204,0.8);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        .done-overlay.show { opacity: 1; }
+
+        /* Key ID input */
+        .input-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            color: var(--muted);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 14px;
+        }
+
+        .input-label input {
+            background: var(--bg);
+            border: 1px solid var(--accent);
+            border-radius: 3px;
+            color: var(--accent);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            text-align: center;
+        }
+
+        .protocol-info {
+            margin-top: 16px;
+            padding: 12px 20px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.65rem;
+            color: var(--muted);
+            max-width: 600px;
+            z-index: 1;
+        }
+
+        .protocol-info h3 {
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .protocol-info ul {
+            margin-left: 20px;
+        }
+
+        .protocol-info li {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>LIGHT KEY (光の鍵)</h1>
+    <p class="subtitle">4-Bit Optical Communication Protocol</p>
+
+    <div class="controls">
+        <label class="input-label">
+            KEY ID:
+            <input type="text" id="keyIdInput" value="1" maxlength="3" style="width:60px;">
+        </label>
+        <button class="btn-start" id="btnStart" onclick="startSim()">▶ TRANSMIT</button>
+        <button class="btn-stop" id="btnStop" onclick="stopSim()" disabled>■ STOP</button>
+        <button class="btn-reset" onclick="resetSim()">↺ RESET</button>
+        <div class="speed-wrap">
+            SPEED
+            <input type="range" id="speedRange" min="1" max="8" value="2" oninput="updateSpeed()">
+            <span id="speedLabel">2 fps</span>
+        </div>
+    </div>
+
+    <div class="message-bar" id="messageBar"></div>
+
+    <div class="canvas-wrap">
+        <canvas id="ledCanvas" width="580" height="220"></canvas>
+        <div class="done-overlay" id="doneOverlay">LIGHT KEY TRANSMITTED</div>
+    </div>
+
+    <div class="nibble-indicator" id="nibbleInfo">—</div>
+
+    <div class="protocol-info">
+        <h3>Light Key Protocol</h3>
+        <ul>
+            <li><strong>Start Sequence:</strong> All LEDs flash 3 times → Sync pattern</li>
+            <li><strong>Data Frames:</strong> 4-bit nibble transmission (high → low)</li>
+            <li><strong>Encryption:</strong> XOR with shared key (0x55)</li>
+            <li><strong>End Sequence:</strong> Spiral pattern confirmation</li>
+            <li><strong>Repeat:</strong> 3 transmissions for reliability</li>
+        </ul>
+    </div>
+
+    <div class="status-row">
+        <div class="stat-box">
+            <div class="stat-label">Character</div>
+            <div class="stat-value accent2" id="statChar">—</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Hex</div>
+            <div class="stat-value white" id="statHex">0x??</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Progress</div>
+            <div class="stat-value accent" id="statProgress">0 / 0</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Phase</div>
+            <div class="stat-value white" id="statPhase">IDLE</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-start" id="btnStart" onclick="startSim()">▶ TRANSMIT</button>
+        <button class="btn-stop" id="btnStop" onclick="stopSim()" disabled>■ STOP</button>
+        <button class="btn-reset" onclick="resetSim()">↺ RESET</button>
+        <div class="speed-wrap">
+            SPEED
+            <input type="range" id="speedRange" min="1" max="8" value="2" oninput="updateSpeed()">
+            <span id="speedLabel">2 fps</span>
+        </div>
+    </div>
+
+    <script>
+        // Light Key Configuration
+        const ENCRYPTION_KEY = 0x55;
+        const REPEAT_COUNT = 3;
+        
+        // Protocol states
+        const STATE_IDLE = 0;
+        const STATE_START_FLASH = 1;
+        const STATE_SYNC = 2;
+        const STATE_DATA = 3;
+        const STATE_END_SPIRAL = 4;
+        const STATE_DONE = 5;
+        
+        let currentState = STATE_IDLE;
+        let stateIndex = 0;
+        let keyId = 1;
+        let encryptedData = [];
+        let sequenceNum = 0;
+        let repeatIndex = 0;
+        
+        // Sync pattern for receiver alignment
+        const SYNC_PATTERN = [0b10101, 0b01010, 0b10101];
+        
+        function generateLightKey(keyId) {
+            // Generate encrypted light key data
+            // Byte 0: Key ID
+            // Byte 1: Sequence number (anti-replay)
+            // Byte 2: XOR encrypted checksum
+            // Byte 3: Validation byte
+            sequenceNum = (sequenceNum + 1) % 256;
+            
+            const data = [];
+            data[0] = keyId & 0xFF;
+            data[1] = sequenceNum;
+            data[2] = (keyId ^ sequenceNum ^ ENCRYPTION_KEY) & 0xFF;
+            data[3] = 0xAA;
+            
+            // XOR encryption
+            for (let i = 0; i < data.length; i++) {
+                data[i] ^= ENCRYPTION_KEY;
+            }
+            
+            return data;
+        }
+        
+        function initTransmission() {
+            keyId = parseInt(document.getElementById('keyIdInput').value) || 1;
+            encryptedData = generateLightKey(keyId);
+            currentState = STATE_START_FLASH;
+            stateIndex = 0;
+            repeatIndex = 0;
+            
+            // Build message display
+            const msgBar = document.getElementById('messageBar');
+            msgBar.innerHTML = '';
+            
+            // Show key ID
+            const keyCell = createCharCell('K', 'KEY');
+            msgBar.appendChild(keyCell);
+            
+            // Show encrypted bytes
+            encryptedData.forEach((byte, i) => {
+                const hex = byte.toString(16).toUpperCase().padStart(2, '0');
+                const cell = createCharCell(hex.substring(0, 1), '0x' + hex);
+                cell.dataset.byteIndex = i;
+                msgBar.appendChild(cell);
+            });
+        }
+        
+        function createCharCell(char, hex) {
+            const cell = document.createElement('div');
+            cell.className = 'char-cell';
+            cell.innerHTML = `${char}<span class="hex">${hex}</span>`;
+            return cell;
+        }
+
+        function updateSpeed() {
+            fps = parseInt(document.getElementById('speedRange').value);
+            document.getElementById('speedLabel').textContent = `${fps} fps`;
+            if (running) { clearTimeout(timerId); scheduleNext(); }
+        }
+
+        function getCurrentPattern() {
+            // Return current LED pattern based on protocol state
+            switch (currentState) {
+                case STATE_START_FLASH:
+                    // Flash all LEDs on/off
+                    return stateIndex % 2 === 0 ? 0b1111 : 0b0000;
+                    
+                case STATE_SYNC:
+                    // Sync pattern (5-bit patterns displayed on 4 LEDs)
+                    return SYNC_PATTERN[stateIndex] & 0b1111;
+                    
+                case STATE_DATA:
+                    // Data transmission - 4 bits at a time
+                    const byteIndex = Math.floor(stateIndex / 2);
+                    const isHighNibble = (stateIndex % 2) === 0;
+                    
+                    if (byteIndex < encryptedData.length) {
+                        const byte = encryptedData[byteIndex];
+                        return isHighNibble ? (byte >> 4) : (byte & 0x0F);
+                    }
+                    return 0b0000;
+                    
+                case STATE_END_SPIRAL:
+                    // End sequence - alternating pattern
+                    return stateIndex % 2 === 0 ? 0b1010 : 0b0101;
+                    
+                default:
+                    return 0b0000;
+            }
+        }
+
+        function advanceState() {
+            switch (currentState) {
+                case STATE_START_FLASH:
+                    stateIndex++;
+                    if (stateIndex >= 6) { // 3 flashes (on/off × 3)
+                        currentState = STATE_SYNC;
+                        stateIndex = 0;
+                    }
+                    break;
+                    
+                case STATE_SYNC:
+                    stateIndex++;
+                    if (stateIndex >= SYNC_PATTERN.length) {
+                        currentState = STATE_DATA;
+                        stateIndex = 0;
+                    }
+                    break;
+                    
+                case STATE_DATA:
+                    stateIndex++;
+                    const totalDataFrames = encryptedData.length * 2; // high + low nibble per byte
+                    if (stateIndex >= totalDataFrames) {
+                        currentState = STATE_END_SPIRAL;
+                        stateIndex = 0;
+                    }
+                    break;
+                    
+                case STATE_END_SPIRAL:
+                    stateIndex++;
+                    if (stateIndex >= 4) {
+                        // Check repeat count
+                        repeatIndex++;
+                        if (repeatIndex < REPEAT_COUNT) {
+                            currentState = STATE_START_FLASH;
+                            stateIndex = 0;
+                        } else {
+                            currentState = STATE_DONE;
+                            stopSim();
+                        }
+                    }
+                    break;
+            }
+        }
+
+        function getPhaseLabel() {
+            switch (currentState) {
+                case STATE_START_FLASH: return 'START';
+                case STATE_SYNC: return 'SYNC';
+                case STATE_DATA: return 'DATA';
+                case STATE_END_SPIRAL: return 'END';
+                case STATE_DONE: return 'DONE';
+                default: return 'IDLE';
+            }
+        }
+
+        function getCurrentData() {
+            if (currentState === STATE_DATA) {
+                const byteIndex = Math.floor(stateIndex / 2);
+                const isHighNibble = (stateIndex % 2) === 0;
+                if (byteIndex < encryptedData.length) {
+                    return {
+                        byte: encryptedData[byteIndex],
+                        nibble: isHighNibble ? 'HIGH' : 'LOW',
+                        charIndex: byteIndex
+                    };
+                }
+            }
+            return null;
+        }
+
+        function drawLed(x, y, radius, isOn, id) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+
+            if (isOn) {
+                const g = ctx.createRadialGradient(x, y, radius * 0.05, x, y, radius * 1.2);
+                g.addColorStop(0, '#ffffff');
+                g.addColorStop(0.25, '#ffdd44');
+                g.addColorStop(0.6, '#ff8800');
+                g.addColorStop(1, 'rgba(255,80,0,0)');
+                ctx.fillStyle = g;
+                ctx.shadowColor = '#ff6b00';
+                ctx.shadowBlur = 28;
+            } else {
+                ctx.fillStyle = '#1a1a28';
+                ctx.shadowBlur = 0;
+            }
+            ctx.fill();
+            ctx.closePath();
+
+            // ring
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = isOn ? 'rgba(255,150,0,0.6)' : '#2a2a3a';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // label
+            ctx.fillStyle = isOn ? '#ffdd88' : '#3a3a55';
+            ctx.font = `500 13px 'Share Tech Mono', monospace`;
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 0;
+            ctx.fillText(`BIT ${id}`, x, y + radius + 22);
+        }
+
+        function renderFrame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // subtle grid lines
+            ctx.strokeStyle = 'rgba(30,30,46,0.8)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 4; i++) {
+                const x = START_X + i * LED_SPACING;
+                ctx.beginPath(); ctx.moveTo(x, 20); ctx.lineTo(x, canvas.height - 20); ctx.stroke();
+            }
+
+            const pattern = getCurrentPattern();
+            for (let i = 0; i < LED_COUNT; i++) {
+                const id = LED_COUNT - 1 - i;
+                const x = START_X + i * LED_SPACING;
+                const isOn = (pattern >> id) & 1;
+                drawLed(x, LED_Y, LED_RADIUS, isOn, id);
+            }
+
+            // State label above
+            const phaseLabel = getPhaseLabel();
+            const dataInfo = getCurrentData();
+            
+            ctx.fillStyle = '#ff6b00';
+            ctx.font = `bold 18px 'Orbitron', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ff6b00';
+            ctx.shadowBlur = 10;
+            
+            if (dataInfo) {
+                const hex = dataInfo.byte.toString(16).toUpperCase().padStart(2, '0');
+                ctx.fillText(`${dataInfo.nibble}  0x${hex}`, canvas.width / 2, 30);
+            } else {
+                ctx.fillText(phaseLabel, canvas.width / 2, 30);
+            }
+            ctx.shadowBlur = 0;
+
+            // Pattern bits display
+            const bits = pattern.toString(2).padStart(4, '0').split('');
+            const bitsLabel = currentState === STATE_DATA ? 
+                (getCurrentData()?.nibble || 'DATA') : phaseLabel;
+            ctx.fillStyle = '#555566';
+            ctx.font = `11px 'Share Tech Mono', monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText(bitsLabel, canvas.width / 2, canvas.height - 16);
+
+            // Nibble indicator
+            const nibbleEl = document.getElementById('nibbleInfo');
+            nibbleEl.innerHTML = `${bitsLabel}:
+                <span class="bit-display">
+                    ${bits.map((b, i) => `<span class="bit ${b === '1' ? 'on' : ''}">${b}</span>`).join('')}
+                </span>
+                &nbsp;= 0b${bits.join('')} (${pattern})
+            `;
+
+            // Stats
+            const progressData = currentState === STATE_DATA ? 
+                `${Math.floor(stateIndex / 2) + 1} / ${encryptedData.length}` : 
+                `${repeatIndex + 1} / ${REPEAT_COUNT}`;
+                
+            document.getElementById('statChar').textContent = `ID:${keyId}`;
+            document.getElementById('statHex').textContent = `SEQ:${sequenceNum}`;
+            document.getElementById('statProgress').textContent = progressData;
+            document.getElementById('statPhase').textContent = phaseLabel;
+
+            // Update char cells
+            const cells = document.querySelectorAll('.char-cell');
+            cells.forEach((cell, i) => {
+                cell.className = 'char-cell';
+                if (currentState === STATE_DATA) {
+                    const currentByteIndex = Math.floor(stateIndex / 2);
+                    if (i > 0 && i - 1 < currentByteIndex) {
+                        cell.classList.add('sent');
+                    } else if (i > 0 && i - 1 === currentByteIndex) {
+                        cell.classList.add('active');
+                    }
+                }
+            });
+        }
+
+        function advance() {
+            advanceState();
+            renderFrame();
+            scheduleNext();
+        }
+
+        function scheduleNext() {
+            timerId = setTimeout(advance, 1000 / fps);
+        }
+
+        function startSim() {
+            if (running) return;
+            
+            // Initialize transmission if starting fresh
+            if (currentState === STATE_IDLE || currentState === STATE_DONE) {
+                initTransmission();
+            }
+            
+            running = true;
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+            document.getElementById('doneOverlay').classList.remove('show');
+            renderFrame();
+            scheduleNext();
+        }
+
+        function stopSim() {
+            running = false;
+            clearTimeout(timerId);
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+        }
+
+        function resetSim() {
+            stopSim();
+            currentState = STATE_IDLE;
+            stateIndex = 0;
+            repeatIndex = 0;
+            keyId = parseInt(document.getElementById('keyIdInput').value) || 1;
+            
+            // Clear message bar
+            const msgBar = document.getElementById('messageBar');
+            msgBar.innerHTML = '';
+            
+            document.getElementById('doneOverlay').classList.remove('show');
+            document.getElementById('statChar').textContent = '—';
+            document.getElementById('statHex').textContent = '0x??';
+            document.getElementById('statProgress').textContent = '0 / 0';
+            document.getElementById('statPhase').textContent = 'IDLE';
+            document.getElementById('nibbleInfo').textContent = '—';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // init
+        resetSim();
+    </script>
+</body>
+</html>

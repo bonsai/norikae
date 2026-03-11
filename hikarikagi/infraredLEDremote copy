@@ -1,0 +1,119 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+const SerialKeyApp = () => {
+  const [status, setStatus] = useState('IDLE'); // 'IDLE', 'SENDING', 'SUCCESS', 'ERROR'
+  const [bitDisplay, setBitDisplay] = useState(false);
+  const [log, setLog] = useState(['UIAP Ready: Waiting for serial pulse...']);
+  const [rxBuffer, setRxBuffer] = useState([]);
+  
+  // 16ビットの冗長鍵 (秘密のバイナリ)
+  const SECRET_KEY = [1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1];
+  const FPS = 6;
+  const bitTime = 1000 / FPS;
+
+  const addLog = (msg) => {
+    setLog(prev => [`[${new Date().toLocaleTimeString().split(' ')[0]}] ${msg}`, ...prev].slice(0, 8));
+  };
+
+  // 送信メイン処理 (スマホ側の動作)
+  const transmitKey = async () => {
+    if (status === 'SENDING') return;
+    setStatus('SENDING');
+    setRxBuffer([]);
+    addLog("🔑 認証開始: 16bitシリアル送信");
+
+    // 1. スタートビット (長めに光らせてUIAPを起こす)
+    setBitDisplay(true);
+    await new Promise(r => setTimeout(r, bitTime * 2));
+    setBitDisplay(false);
+    await new Promise(r => setTimeout(r, bitTime));
+
+    // 2. データビット送信
+    for (let i = 0; i < SECRET_KEY.length; i++) {
+      const bit = SECRET_KEY[i];
+      setBitDisplay(bit === 1);
+      
+      // UIAP側のデコードをシミュレート
+      decodeOnUIAP(bit, i);
+      
+      await new Promise(r => setTimeout(r, bitTime));
+    }
+
+    setBitDisplay(false);
+    setStatus('IDLE');
+    addLog("送信完了");
+  };
+
+  // UIAP側のデコードロジック (冗長性チェック付き)
+  const decodeOnUIAP = (bit, index) => {
+    setRxBuffer(prev => {
+      const next = [...prev, bit];
+      
+      // リアルタイム照合
+      if (bit !== SECRET_KEY[index]) {
+        // 冗長性の考え方: 1ビット間違えても即座に切らず、最後に判定しても良い
+        // ここではシミュレーションとしてログに出す
+      }
+
+      if (next.length === SECRET_KEY.length) {
+        const isMatch = next.every((v, i) => v === SECRET_KEY[i]);
+        if (isMatch) {
+          setStatus('SUCCESS');
+          addLog("🔓 照合成功! サーボ解錠");
+          setTimeout(() => setStatus('IDLE'), 3000);
+        } else {
+          setStatus('ERROR');
+          addLog("❌ 照合失敗: データ破損");
+          setTimeout(() => setStatus('IDLE'), 2000);
+        }
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div className="flex flex-col items-center min-h-screen bg-black text-gray-300 p-6 font-mono">
+      <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl">
+        <h2 className="text-center text-sm tracking-widest text-zinc-500 mb-8">SINGLE FT SERIAL LOCK</h2>
+
+        {/* 送信パネル (スマホ画面) */}
+        <div 
+          onClick={transmitKey}
+          className={`w-40 h-40 mx-auto rounded-full border-4 border-zinc-700 cursor-pointer transition-colors duration-75 flex items-center justify-center ${
+            bitDisplay ? 'bg-white shadow-[0_0_50px_rgba(255,255,255,0.8)]' : 'bg-black'
+          }`}
+        >
+          <span className={`text-[10px] font-bold ${bitDisplay ? 'text-black' : 'text-zinc-800'}`}>
+            {status === 'SENDING' ? 'TRANSMITTING' : 'TOUCH TO UNLOCK'}
+          </span>
+        </div>
+
+        {/* ステータス表示 */}
+        <div className={`mt-10 p-4 rounded-xl text-center border-2 transition-all ${
+          status === 'SUCCESS' ? 'border-green-500 text-green-500 bg-green-500/10' :
+          status === 'ERROR' ? 'border-red-500 text-red-500 bg-red-500/10' :
+          'border-zinc-700 text-zinc-500'
+        }`}>
+          <div className="text-xs mb-1">UIAP STATUS</div>
+          <div className="font-bold">{status}</div>
+        </div>
+
+        {/* 冗長バッファの可視化 */}
+        <div className="mt-4 flex justify-center gap-1">
+          {Array.from({length: 16}).map((_, i) => (
+            <div key={i} className={`w-2 h-2 rounded-full ${
+              rxBuffer.length > i ? (rxBuffer[i] === SECRET_KEY[i] ? 'bg-green-500' : 'bg-red-500') : 'bg-zinc-800'
+            }`}></div>
+          ))}
+        </div>
+
+        {/* デバッグログ */}
+        <div className="mt-6 bg-black p-3 rounded-lg h-32 overflow-y-auto text-[10px] border border-zinc-800">
+          {log.map((l, i) => <div key={i} className="mb-1">{l}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SerialKeyApp;

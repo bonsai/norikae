@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Digit STT - Quiz Game</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="game-box">
+    <h1>🔢 数字をしゃべって！</h1>
+    <p id="status">システムロード中...</p>
+    <div id="output">?</div>
+    <div id="confidence-display"></div>
+    <button id="talkBtn" disabled>クリックして話す</button>
+    <p class="hint">0 から 9 の数字を言ってください</p>
+  </div>
+
+  <script type="module">
+    import { 
+      initPyodide, 
+      getPyodide, 
+      recordAudio, 
+      loadDigitTemplates, 
+      recognizeDigit 
+    } from "./js/app.js";
+
+    // Expose to global scope for browser modules
+    window.getPyodide = getPyodide;
+
+    const statusEl = document.getElementById("status");
+    const outputEl = document.getElementById("output");
+    const confidenceEl = document.getElementById("confidence-display");
+    const talkBtn = document.getElementById("talkBtn");
+
+    /**
+     * Initialize the application
+     */
+    async function init() {
+      try {
+        // Initialize Pyodide
+        await initPyodide();
+
+        // Load digit templates from JSON
+        const templates = await loadDigitTemplates("./digits.json");
+
+        // Check if templates are populated
+        const hasData = Object.values(templates).some((v) => v && v.length > 0);
+        if (!hasData) {
+          statusEl.innerHTML =
+            "⚠️ 数字データが未登録です。<br><a href='admin.html'>管理者ページ</a>で登録してください";
+        } else {
+          statusEl.innerText = "準備完了。0 から 9 の数字をどうぞ。";
+        }
+
+        talkBtn.disabled = false;
+      } catch (error) {
+        console.error("Initialization error:", error);
+        statusEl.innerText = "エラー：読み込みに失敗しました";
+      }
+    }
+
+    /**
+     * Handle talk button click
+     */
+    async function handleTalk() {
+      if (talkBtn.disabled) return;
+
+      talkBtn.disabled = true;
+      talkBtn.classList.add("mic-active");
+      outputEl.innerText = "👂";
+      confidenceEl.innerText = "";
+      statusEl.innerText = "録音中...";
+
+      try {
+        // Record audio (2.5 seconds)
+        const audio = await recordAudio(2500);
+
+        statusEl.innerText = "認識中...";
+
+        // Recognize digit
+        const result = await recognizeDigit(audio, 0.8);
+
+        if (result.digit !== null) {
+          outputEl.innerText = result.digit;
+          confidenceEl.innerText = `信頼度：${(result.confidence * 100).toFixed(1)}%`;
+          statusEl.innerText = "認識完了！";
+        } else {
+          outputEl.innerText = "❓";
+          confidenceEl.innerText = `信頼度：${(result.confidence * 100).toFixed(1)}% (閾値未満)`;
+          statusEl.innerText = "もう一度はっきり言ってください";
+        }
+
+        console.log("Recognition result:", result);
+      } catch (error) {
+        console.error("Recognition error:", error);
+        statusEl.innerText = "エラー：" + error.message;
+        outputEl.innerText = "❌";
+      } finally {
+        talkBtn.classList.remove("mic-active");
+        talkBtn.disabled = false;
+      }
+    }
+
+    // Event listeners
+    talkBtn.addEventListener("click", handleTalk);
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>

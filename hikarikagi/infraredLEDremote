@@ -1,0 +1,102 @@
+import React, { useState, useEffect } from 'react';
+
+const RemoteDecoder = () => {
+  const [lightLevel, setLightLevel] = useState(0);
+  const [bitBuffer, setBitBuffer] = useState([]);
+  const [decodedHex, setDecodedHex] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // 鍵のデータ (4bitずつ 0xA, 0x5, 0xF)
+  const KEY_SEQUENCE = [1, 0, 1, 0,  0, 1, 0, 1,  1, 1, 1, 1]; 
+  const FPS = 6;
+  const bitTime = 1000 / FPS;
+
+  // スマホ送信エミュレーション
+  const sendRemoteSignal = async () => {
+    setIsSyncing(true);
+    setBitBuffer([]);
+    setDecodedHex('');
+
+    // リーダーパルス (スタート合図)
+    setLightLevel(100);
+    await new Promise(r => setTimeout(r, bitTime * 2));
+    setLightLevel(0);
+    await new Promise(r => setTimeout(r, bitTime));
+
+    // データ送信
+    for (let bit of KEY_SEQUENCE) {
+      setLightLevel(bit ? 100 : 0);
+      
+      // 受信側（UIAP）の処理をシミュレート
+      setBitBuffer(prev => [...prev, bit]);
+      
+      await new Promise(r => setTimeout(r, bitTime));
+    }
+
+    setLightLevel(0);
+    setIsSyncing(false);
+  };
+
+  // ビット列を16進数に変換
+  useEffect(() => {
+    if (bitBuffer.length === KEY_SEQUENCE.length) {
+      const hex = parseInt(bitBuffer.join(''), 2).toString(16).toUpperCase();
+      setDecodedHex(hex);
+    }
+  }, [bitBuffer]);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-zinc-300 p-8 font-mono">
+      <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-2xl">
+        <h2 className="text-center text-xs tracking-widest text-zinc-500 mb-6 uppercase">Infrared Remote Style Lock</h2>
+
+        {/* 送信部（スマホ画面） */}
+        <div className="flex flex-col items-center mb-8">
+          <div 
+            className={`w-32 h-32 rounded-2xl mb-4 transition-colors duration-75 border-4 border-zinc-700 ${
+              lightLevel > 0 ? 'bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.5)]' : 'bg-black'
+            }`}
+          ></div>
+          <button 
+            onClick={sendRemoteSignal}
+            disabled={isSyncing}
+            className="px-6 py-2 bg-zinc-100 text-zinc-900 font-bold rounded-full active:scale-95 disabled:opacity-50 transition-all"
+          >
+            {isSyncing ? 'SENDING...' : 'SEND KEY'}
+          </button>
+        </div>
+
+        {/* 受信部（UIAP内部状態） */}
+        <div className="bg-black rounded-2xl p-4 border border-zinc-800">
+          <div className="text-[10px] text-zinc-500 mb-2">UIAP RECEIVER LOG</div>
+          <div className="flex flex-wrap gap-1 mb-4">
+            {bitBuffer.map((b, i) => (
+              <div key={i} className={`w-3 h-6 rounded-sm ${b ? 'bg-red-500' : 'bg-zinc-800'}`}></div>
+            ))}
+            {Array(KEY_SEQUENCE.length - bitBuffer.length).fill(0).map((_, i) => (
+              <div key={i+100} className="w-3 h-6 rounded-sm bg-zinc-900 border border-zinc-800"></div>
+            ))}
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-xs">DECODED:</span>
+            <span className={`text-xl font-bold ${decodedHex === 'A5F' ? 'text-green-500' : 'text-zinc-400'}`}>
+              {decodedHex ? `0x${decodedHex}` : '----'}
+            </span>
+          </div>
+        </div>
+
+        {decodedHex === 'A5F' && (
+          <div className="mt-4 text-center text-green-500 text-xs animate-pulse">
+            🔓 UNLOCK SIGNAL SENT
+          </div>
+        )}
+      </div>
+      <p className="mt-6 text-[10px] text-zinc-600 text-center max-w-xs">
+        赤外線リモコンと同じシリアル方式です。スマホの画面を「巨大な赤外線LED」として使い、1個のセンサーで読み取ります。
+      </p>
+    </div>
+  );
+};
+
+export default RemoteDecoder;

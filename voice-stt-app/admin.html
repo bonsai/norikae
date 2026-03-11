@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice STT Admin - 数字登録</title>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="admin-box">
+    <h1>🎙️ 数字音声 登録管理</h1>
+    <p id="main-status">システム準備中...</p>
+
+    <div class="digit-grid" id="digit-grid"></div>
+
+    <hr />
+
+    <h2>📦 エクスポート用データ</h2>
+    <p class="hint">
+      以下の JSON をコピーして <code>digits.json</code> に貼り付けてください
+    </p>
+    <pre id="export-data">{}</pre>
+    <button id="copyBtn" class="btn-copy">クリップボードにコピー</button>
+  </div>
+
+  <div id="toast"></div>
+
+  <script type="module">
+    import { 
+      initPyodide, 
+      getPyodide, 
+      recordAudio, 
+      hasVoiceActivity, 
+      registerDigitAveraged, 
+      exportTemplates 
+    } from "./js/app.js";
+
+    window.getPyodide = getPyodide;
+
+    const digitTemplates = {};
+    let isRecording = false;
+
+    const mainStatus = document.getElementById("main-status");
+    const digitGrid = document.getElementById("digit-grid");
+    const exportDataEl = document.getElementById("export-data");
+    const copyBtn = document.getElementById("copyBtn");
+    const toast = document.getElementById("toast");
+
+    /**
+     * Initialize admin page
+     */
+    async function init() {
+      await initPyodide();
+      mainStatus.innerText = "✅ 準備完了。各数字を 3 回ずつ録音してください。";
+      renderDigitGrid();
+    }
+
+    /**
+     * Render digit registration buttons
+     */
+    function renderDigitGrid() {
+      digitGrid.innerHTML = Array.from({ length: 10 }, (_, i) => {
+        const digit = i.toString();
+        const isRegistered = digitTemplates[digit] && digitTemplates[digit].length > 0;
+        return `
+          <div class="digit-card ${isRegistered ? "registered" : ""}">
+            <span class="digit-label">${digit}</span>
+            <button 
+              class="btn-rec" 
+              onclick="window.startDigitRegistration('${digit}')"
+              ${isRecording ? "disabled" : ""}
+            >
+              ${isRegistered ? "再録音" : "録音"}
+            </button>
+            <span class="status-indicator">${isRegistered ? "✅" : "⚪"}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    /**
+     * Start digit registration (3 recordings averaged)
+     */
+    async function startDigitRegistration(digit) {
+      if (isRecording) return;
+      isRecording = true;
+      renderDigitGrid();
+
+      const audioSamples = [];
+
+      try {
+        for (let i = 1; i <= 3; i++) {
+          mainStatus.innerText = `数字「${digit}」を録音中... (${i}/3)`;
+          
+          // Visual countdown
+          for (let j = 3; j > 0; j--) {
+            mainStatus.innerText = `数字「${digit}」を録音中... (${i}/3) - ${j}秒後`;
+            await sleep(1000);
+          }
+
+          const audio = await recordAudio(2000);
+          
+          // Check if audio has voice
+          if (!hasVoiceActivity(audio, 0.015)) {
+            showToast(`⚠️ 音声が検出されませんでした (${i}/3)`);
+            i--; // Retry this recording
+            continue;
+          }
+
+          audioSamples.push(audio);
+          showToast(`✅ ${i}回目完了`);
+          await sleep(500);
+        }
+
+        if (audioSamples.length === 3) {
+          mainStatus.innerText = `数字「${digit}」を処理中...`;
+          const featureVec = await registerDigitAveraged(digit, audioSamples);
+          console.log(`Registered digit ${digit}:`, featureVec);
+          showToast(`✅ 数字「${digit}」を登録完了！`);
+          updateExportData();
+          renderDigitGrid();
+        } else {
+          showToast(`⚠️ 登録に失敗しました (${audioSamples.length}/3)`);
+        }
+      } catch (error) {
+        console.error("Registration error:", error);
+        showToast("❌ エラー：" + error.message);
+      } finally {
+        isRecording = false;
+        mainStatus.innerText = "✅ 準備完了。次の数字を登録してください。";
+        renderDigitGrid();
+      }
+    }
+
+    /**
+     * Update export data display
+     */
+    function updateExportData() {
+      const json = exportTemplates();
+      exportDataEl.innerText = json;
+    }
+
+    /**
+     * Copy to clipboard
+     */
+    async function copyToClipboard() {
+      try {
+        await navigator.clipboard.writeText(exportDataEl.innerText);
+        showToast("✅ クリップボードにコピーしました！");
+      } catch (error) {
+        showToast("❌ コピーに失敗しました");
+      }
+    }
+
+    /**
+     * Utility: Sleep for milliseconds
+     */
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Show toast notification
+     */
+    function showToast(message) {
+      toast.innerText = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 3000);
+    }
+
+    // Expose to global scope for onclick handlers
+    window.startDigitRegistration = startDigitRegistration;
+
+    // Event listeners
+    copyBtn.addEventListener("click", copyToClipboard);
+
+    // Initialize
+    init();
+  </script>
+</body>
+</html>
