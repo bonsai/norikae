@@ -1,0 +1,14 @@
+# ECG Monitor
+numpy>=1.24.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+biosppy>=1.0.0
+heartpy>=1.2.7
+wfdb>=4.1.0
+
+# TinyML (optional)
+emlearn>=0.10.0
+scikit-learn>=1.2.0
+
+# WebSerial/PWA (optional)
+flask>=2.3.0

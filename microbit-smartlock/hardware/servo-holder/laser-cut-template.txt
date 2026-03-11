@@ -1,0 +1,132 @@
+# Laser Cut Template - U-Slot Coupler
+# Micro:bit Smart Lock Servo Holder
+# Material: 3mm acrylic or plywood (3 layers)
+
+# ==================== LAYER 1: BASE PLATE ====================
+# This layer mounts to the servo horn
+
+LAYER1_OUTLINE:
+  Shape: Rectangle with rounded corners
+  Dimensions: 40mm × 20mm
+  Corner radius: 3mm
+  
+SERVO_HORN_MOUNTING:
+  Center hole: 5.5mm diameter (MG90S spline)
+  Spline teeth: 24 teeth, 0.5mm deep
+  Position: 10mm from left edge, centered vertically
+  
+SCREW_HOLES:
+  Diameter: 2.5mm (for M2 screws)
+  Positions: 
+    - (15mm, 5mm) from bottom-left corner
+    - (15mm, 15mm) from bottom-left corner
+    - (35mm, 10mm) from bottom-left edge
+
+# ==================== LAYER 2: U-SLOT SPACER ====================
+# This layer creates the "play" gap for manual override
+
+LAYER2_OUTLINE:
+  Shape: Same as Layer 1
+  Dimensions: 40mm × 20mm
+  Corner radius: 3mm
+  
+U_SLOT_CUTOUT:
+  Shape: U-channel (open on right side)
+  Width: 12mm (adjust for your thumb-turn + 2mm clearance)
+  Depth: 15mm from right edge
+  Position: Centered vertically
+  
+INTERNAL_CUTOUTS:
+  Purpose: Weight reduction, material savings
+  Shape: Rectangles with rounded corners
+  Dimensions: 25mm × 10mm
+  Position: Centered, avoiding U-slot and mounting areas
+
+# ==================== LAYER 3: TOP PLATE ====================
+# This layer grips the thumb-turn
+
+LAYER3_OUTLINE:
+  Shape: Same as Layer 1
+  Dimensions: 40mm × 20mm
+  Corner radius: 3mm
+  
+THUMB_TURN_GRIP:
+  Shape: Rectangular opening (matches thumb-turn)
+  Width: [MEASURE YOUR LOCK] + 1mm clearance
+  Height: [MEASURE YOUR LOCK] + 1mm clearance
+  Position: 5mm from right edge, centered vertically
+  
+GRIP_TEXTURE:
+  Purpose: Increase friction for better grip
+  Pattern: Parallel lines, 0.5mm deep
+  Spacing: 2mm apart
+  Position: Inside grip opening edges
+
+# ==================== ASSEMBLY ====================
+
+MATERIALS_NEEDED:
+  - 3mm acrylic sheet × 3 (or 3mm plywood)
+  - M2 screws × 4 (6mm length)
+  - M2 nuts × 4 (nylon lock nuts preferred)
+  - Optional: Rubber sheet 1mm (for grip lining)
+
+ASSEMBLY_STEPS:
+  1. Cut all three layers from material
+  2. Deburr edges with sandpaper (220 grit)
+  3. Optional: Line Layer 3 grip with thin rubber
+  4. Stack layers: Layer 1 (bottom) → Layer 2 → Layer 3 (top)
+  5. Insert M2 screws through all layers
+  6. Tighten nuts (don't overtighten acrylic)
+  7. Test fit on servo horn
+  8. Test U-slot play with thumb-turn
+
+# ==================== DXF EXPORT SETTINGS ====================
+
+UNITS: Millimeters
+SCALE: 1:1 (no scaling)
+KERF_COMPENSATION: 
+  - Acrylic: +0.1mm per cut (adjust for your laser)
+  - Wood: +0.15mm per cut (adjust for your laser)
+  
+LAYER_COLORS (for laser software):
+  - Cut lines: Red (RGB: 255, 0, 0)
+  - Engrave lines: Black (RGB: 0, 0, 0)
+  - Score lines: Blue (RGB: 0, 0, 255)
+
+# ==================== MEASUREMENT GUIDE ====================
+
+Before cutting, measure your thumb-turn:
+
+    ┌─────────────────┐
+    │   Thumb-turn    │
+    │   ╔═════════╗   │
+    │   ║  WIDTH  ║   │ ← Measure across (typically 8-12mm)
+    │   ╚═════════╝   │
+    │      │││        │
+    │      │││        │ ← Measure height (typically 5-8mm)
+    │      └┴┘        │
+    └─────────────────┘
+
+Add 1-2mm clearance to each dimension for smooth operation.
+
+# ==================== ALTERNATIVE: CARDBOARD PROTOTYPE ====================
+
+For testing before cutting acrylic:
+
+MATERIAL:
+  - Cardboard (corrugated, ~3mm thick) × 3 layers
+  - Hot glue or strong tape
+  - Scissors or craft knife
+
+TEMPLATE (print at 100% scale):
+  - Copy the dimensions above
+  - Trace onto cardboard
+  - Cut with craft knife
+  - Assemble with hot glue
+
+TEST PROCEDURE:
+  1. Attach to servo horn
+  2. Test manual override (should move freely)
+  3. Test servo operation (should turn lock)
+  4. Adjust dimensions if needed
+  5. Use final dimensions for acrylic cutting

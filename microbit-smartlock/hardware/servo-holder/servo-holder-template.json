@@ -1,0 +1,43 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "Micro:bit Smart Lock Servo Holder"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Servo Holder Assembly",
+      "nodes": [0, 1, 2, 3, 4, 5, 6, 7]
+    }
+  ],
+  "nodes": [
+    {"name": "Servo Mount", "mesh": 0, "translation": [0, 0, 0]},
+    {"name": "Center Post", "mesh": 1, "translation": [0, 0, -1]},
+    {"name": "Connection Arm", "mesh": 2, "translation": [12.5, 0, 0]},
+    {"name": "Magnet Housing Servo", "mesh": 3, "translation": [25, 0, 2]},
+    {"name": "Magnet 1", "mesh": 4, "translation": [25, 0, 5]},
+    {"name": "Magnet 2", "mesh": 5, "translation": [40, 0, 5]},
+    {"name": "Magnet Housing Thumb", "mesh": 6, "translation": [40, 0, 2]},
+    {"name": "Thumb Grip", "mesh": 7, "translation": [45, 0, 1]}
+  ],
+  "meshes": [
+    {"primitives": [{"attributes": {"POSITION": 0}, "material": 0}]},
+    {"primitives": [{"attributes": {"POSITION": 1}, "material": 0}]},
+    {"primitives": [{"attributes": {"POSITION": 2}, "material": 1}]},
+    {"primitives": [{"attributes": {"POSITION": 3}, "material": 2}]},
+    {"primitives": [{"attributes": {"POSITION": 4}, "material": 3}]},
+    {"primitives": [{"attributes": {"POSITION": 5}, "material": 3}]},
+    {"primitives": [{"attributes": {"POSITION": 6}, "material": 4}]},
+    {"primitives": [{"attributes": {"POSITION": 7}, "material": 4}]}
+  ],
+  "materials": [
+    {"name": "Blue PLA", "pbrMetallicRoughness": {"baseColorFactor": [0.25, 0.45, 0.75, 1.0], "metallicFactor": 0.1, "roughnessFactor": 0.5}},
+    {"name": "Gray PETG", "pbrMetallicRoughness": {"baseColorFactor": [0.35, 0.35, 0.35, 1.0], "metallicFactor": 0.2, "roughnessFactor": 0.6}},
+    {"name": "Red PLA", "pbrMetallicRoughness": {"baseColorFactor": [0.75, 0.35, 0.35, 1.0], "metallicFactor": 0.1, "roughnessFactor": 0.5}},
+    {"name": "Silver Magnet", "pbrMetallicRoughness": {"baseColorFactor": [0.7, 0.7, 0.7, 1.0], "metallicFactor": 0.9, "roughnessFactor": 0.2}},
+    {"name": "Green PLA", "pbrMetallicRoughness": {"baseColorFactor": [0.35, 0.75, 0.35, 1.0], "metallicFactor": 0.1, "roughnessFactor": 0.5}}
+  ],
+  "buffers": [{"byteLength": 0}],
+  "bufferViews": [],
+  "accessors": []
+}

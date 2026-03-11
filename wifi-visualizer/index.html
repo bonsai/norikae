@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Strength Visualizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+        }
+
+        .map-container {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #wifiMap {
+            width: 100%;
+            height: 500px;
+            background: #0a0a1a;
+            border-radius: 15px;
+            cursor: crosshair;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0,212,255,0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff4757, #ff3838);
+            color: #fff;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .panel h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: #00d4ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .signal-meter {
+            position: relative;
+            height: 200px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .signal-bar {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            transition: height 0.3s ease, background-color 0.3s ease;
+            border-radius: 5px 5px 0 0;
+        }
+
+        .signal-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .signal-label {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .stat-item {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .network-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .network-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .network-item:hover {
+            background: rgba(0,0,0,0.3);
+        }
+
+        .network-name {
+            font-weight: 600;
+        }
+
+        .network-strength {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .wifi-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .walking-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+
+        .walk-btn {
+            padding: 15px;
+            font-size: 1.5rem;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .walk-btn:hover {
+            background: rgba(0,212,255,0.3);
+            transform: scale(1.05);
+        }
+
+        .walk-btn:active {
+            transform: scale(0.95);
+        }
+
+        .walk-btn.active {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            border-color: #00d4ff;
+        }
+
+        .speed-control {
+            margin-top: 15px;
+        }
+
+        .speed-control label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .speed-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .speed-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 10px;
+            border-radius: 2px;
+        }
+
+        .coordinates {
+            font-family: monospace;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .walking-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(0,212,255,0.2);
+            border-radius: 20px;
+            margin-top: 10px;
+        }
+
+        .walking-dot {
+            width: 8px;
+            height: 8px;
+            background: #00d4ff;
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📶 WiFi Strength Visualizer</h1>
+            <p>Walk around and visualize WiFi signal strength in real-time</p>
+        </header>
+
+        <div class="main-content">
+            <div class="map-container">
+                <canvas id="wifiMap"></canvas>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="toggleWalking()">
+                        <span>🚶</span> <span id="walkBtnText">Start Walking</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="addAccessPoint()">
+                        <span>📡</span> Add Access Point
+                    </button>
+                    <button class="btn btn-secondary" onclick="toggleHeatmap()">
+                        <span>🔥</span> Toggle Heatmap
+                    </button>
+                    <button class="btn btn-danger" onclick="resetSimulation()">
+                        <span>🔄</span> Reset
+                    </button>
+                </div>
+                <div class="coordinates">
+                    Position: <span id="positionDisplay">0, 0</span>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="panel">
+                    <h2>📊 Signal Strength</h2>
+                    <div class="signal-meter">
+                        <div class="signal-bar" id="signalBar"></div>
+                        <div class="signal-value" id="signalValue">-∞</div>
+                        <div class="signal-label">dBm</div>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ff4757;"></div>
+                            <span>Poor</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ffa502;"></div>
+                            <span>Fair</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #2ed573;"></div>
+                            <span>Good</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #00d4ff;"></div>
+                            <span>Excellent</span>
+                        </div>
+                    </div>
+                    <div class="walking-indicator" id="walkingIndicator" style="display: none;">
+                        <div class="walking-dot"></div>
+                        <span>Walking Mode Active</span>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>🚶 Walking Controls</h2>
+                    <div class="walking-controls">
+                        <div></div>
+                        <button class="walk-btn" id="btnUp" onclick="setDirection('up')">↑</button>
+                        <div></div>
+                        <button class="walk-btn" id="btnLeft" onclick="setDirection('left')">←</button>
+                        <button class="walk-btn" id="btnDown" onclick="setDirection('down')">↓</button>
+                        <button class="walk-btn" id="btnRight" onclick="setDirection('right')">→</button>
+                    </div>
+                    <div class="speed-control">
+                        <label>Walking Speed: <span id="speedValue">5</span>m/s</label>
+                        <input type="range" class="speed-slider" id="speedSlider" 
+                               min="1" max="10" value="5" oninput="updateSpeed(this.value)">
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>📈 Statistics</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value" id="avgSignal">-</div>
+                            <div class="stat-label">Avg Signal (dBm)</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="distance">0</div>
+                            <div class="stat-label">Distance (m)</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="accessPoints">0</div>
+                            <div class="stat-label">Access Points</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="maxSignal">-∞</div>
+                            <div class="stat-label">Best Signal (dBm)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>🌐 Networks</h2>
+                    <div class="network-list" id="networkList">
+                        <p style="opacity: 0.6; text-align: center;">No access points added</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('wifiMap');
+        const ctx = canvas.getContext('2d');
+        
+        // Resize canvas
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // State
+        let accessPoints = [];
+        let player = { x: 0, y: 0 };
+        let isWalking = false;
+        let walkingDirection = null;
+        let walkingSpeed = 5;
+        let showHeatmap = true;
+        let totalDistance = 0;
+        let signalHistory = [];
+        let animationId = null;
+
+        // Initialize with some access points
+        function initAccessPoints() {
+            accessPoints = [
+                { id: 1, name: 'Home WiFi', x: canvas.width / 2, y: canvas.height / 2, power: 20, channel: 6 },
+                { id: 2, name: 'Neighbor_5G', x: canvas.width * 0.3, y: canvas.height * 0.3, power: 15, channel: 36 },
+                { id: 3, name: 'Office_AP', x: canvas.width * 0.7, y: canvas.height * 0.7, power: 18, channel: 11 }
+            ];
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            updateNetworkList();
+        }
+
+        // Calculate signal strength at position
+        function calculateSignal(x, y) {
+            let totalSignal = -Infinity;
+            
+            accessPoints.forEach(ap => {
+                const dx = x - ap.x;
+                const dy = y - ap.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Free space path loss model (simplified)
+                const signalStrength = ap.power - 20 * Math.log10(distance / 50 + 1);
+                
+                if (signalStrength > totalSignal) {
+                    totalSignal = signalStrength;
+                }
+            });
+            
+            return accessPoints.length > 0 ? totalSignal : -Infinity;
+        }
+
+        // Get signal color based on strength
+        function getSignalColor(signal) {
+            if (signal === -Infinity) return 'rgba(100, 100, 100, 0.3)';
+            
+            if (signal >= -50) return 'rgba(0, 212, 255, 0.8)';      // Excellent
+            if (signal >= -60) return 'rgba(46, 213, 115, 0.7)';    // Good
+            if (signal >= -70) return 'rgba(255, 165, 2, 0.6)';     // Fair
+            if (signal >= -80) return 'rgba(255, 71, 87, 0.5)';     // Poor
+            return 'rgba(255, 0, 0, 0.4)';                          // Very poor
+        }
+
+        // Get signal bar color
+        function getBarColor(signal) {
+            if (signal === -Infinity) return '#666';
+            if (signal >= -50) return '#00d4ff';
+            if (signal >= -60) return '#2ed573';
+            if (signal >= -70) return '#ffa502';
+            if (signal >= -80) return '#ff4757';
+            return '#ff0000';
+        }
+
+        // Draw heatmap
+        function drawHeatmap() {
+            if (!showHeatmap || accessPoints.length === 0) return;
+            
+            const imageData = ctx.createImageData(canvas.width, canvas.height);
+            const resolution = 8; // Process every Nth pixel for performance
+            
+            for (let y = 0; y < canvas.height; y += resolution) {
+                for (let x = 0; x < canvas.width; x += resolution) {
+                    const signal = calculateSignal(x, y);
+                    const color = getSignalColor(signal);
+                    const rgba = parseColor(color);
+                    
+                    for (let dy = 0; dy < resolution && y + dy < canvas.height; dy++) {
+                        for (let dx = 0; dx < resolution && x + dx < canvas.width; dx++) {
+                            const idx = ((y + dy) * canvas.width + (x + dx)) * 4;
+                            imageData.data[idx] = rgba.r;
+                            imageData.data[idx + 1] = rgba.g;
+                            imageData.data[idx + 2] = rgba.b;
+                            imageData.data[idx + 3] = rgba.a;
+                        }
+                    }
+                }
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Parse color string to RGBA
+        function parseColor(colorStr) {
+            const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*([\d.]+)?\)/);
+            if (match) {
+                return {
+                    r: parseInt(match[1]),
+                    g: parseInt(match[2]),
+                    b: parseInt(match[3]),
+                    a: match[4] ? parseFloat(match[4]) * 255 : 255
+                };
+            }
+            return { r: 100, g: 100, b: 100, a: 77 };
+        }
+
+        // Draw access points
+        function drawAccessPoints() {
+            accessPoints.forEach(ap => {
+                // Signal rings
+                for (let i = 3; i > 0; i--) {
+                    ctx.beginPath();
+                    ctx.arc(ap.x, ap.y, i * 40, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(0, 212, 255, ${0.3 / i})`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+                
+                // AP icon
+                ctx.beginPath();
+                ctx.arc(ap.x, ap.y, 15, 0, Math.PI * 2);
+                ctx.fillStyle = '#00d4ff';
+                ctx.fill();
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('📡', ap.x, ap.y);
+                
+                // Label
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Segoe UI';
+                ctx.fillText(ap.name, ap.x, ap.y - 25);
+            });
+        }
+
+        // Draw player
+        function drawPlayer() {
+            // Player circle
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, 20, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 71, 87, 0.3)';
+            ctx.fill();
+            ctx.strokeStyle = '#ff4757';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Walking person icon
+            ctx.fillStyle = '#fff';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(isWalking ? '🚶' : '📍', player.x, player.y);
+            
+            // Direction indicator
+            if (walkingDirection) {
+                const arrowLength = 35;
+                let dx = 0, dy = 0;
+                switch(walkingDirection) {
+                    case 'up': dy = -arrowLength; break;
+                    case 'down': dy = arrowLength; break;
+                    case 'left': dx = -arrowLength; break;
+                    case 'right': dx = arrowLength; break;
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(player.x + dx, player.y + dy);
+                ctx.strokeStyle = '#00d4ff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+        }
+
+        // Main render loop
+        function render() {
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            const gridSize = 50;
+            
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            drawHeatmap();
+            drawAccessPoints();
+            drawPlayer();
+            
+            requestAnimationFrame(render);
+        }
+
+        // Update signal display
+        function updateSignalDisplay() {
+            const signal = calculateSignal(player.x, player.y);
+            const signalBar = document.getElementById('signalBar');
+            const signalValue = document.getElementById('signalValue');
+            
+            if (signal === -Infinity) {
+                signalBar.style.height = '0%';
+                signalValue.textContent = '-∞';
+                signalBar.style.background = '#666';
+            } else {
+                // Map -30 to -100 dBm to 0-100%
+                const percentage = Math.max(0, Math.min(100, (signal + 100) * 1.43));
+                signalBar.style.height = `${percentage}%`;
+                signalValue.textContent = Math.round(signal);
+                signalBar.style.background = getBarColor(signal);
+                
+                // Update statistics
+                signalHistory.push(signal);
+                if (signalHistory.length > 100) signalHistory.shift();
+                
+                const avg = signalHistory.reduce((a, b) => a + b, 0) / signalHistory.length;
+                const max = Math.max(...signalHistory);
+                
+                document.getElementById('avgSignal').textContent = Math.round(avg);
+                document.getElementById('maxSignal').textContent = Math.round(max);
+            }
+        }
+
+        // Update network list
+        function updateNetworkList() {
+            const list = document.getElementById('networkList');
+            
+            if (accessPoints.length === 0) {
+                list.innerHTML = '<p style="opacity: 0.6; text-align: center;">No access points added</p>';
+                return;
+            }
+            
+            list.innerHTML = accessPoints.map(ap => {
+                const signal = calculateSignal(player.x, player.y);
+                const distance = Math.sqrt(Math.pow(player.x - ap.x, 2) + Math.pow(player.y - ap.y, 2));
+                const isClosest = accessPoints.every(other => 
+                    distance <= Math.sqrt(Math.pow(player.x - other.x, 2) + Math.pow(player.y - other.y, 2))
+                );
+                
+                return `
+                    <div class="network-item" style="${isClosest ? 'border: 1px solid #00d4ff;' : ''}">
+                        <div>
+                            <div class="network-name">${ap.name}</div>
+                            <div style="font-size: 0.8rem; opacity: 0.7;">Ch ${ap.channel} • ${(distance / 10).toFixed(1)}m</div>
+                        </div>
+                        <div class="network-strength">
+                            ${getWifiIcon(signal)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('accessPoints').textContent = accessPoints.length;
+        }
+
+        // Get WiFi icon SVG based on signal
+        function getWifiIcon(signal) {
+            const bars = signal === -Infinity ? 0 :
+                signal >= -50 ? 4 :
+                signal >= -60 ? 3 :
+                signal >= -70 ? 2 :
+                signal >= -80 ? 1 : 0;
+            
+            let icon = '<svg class="wifi-icon" viewBox="0 0 24 24" fill="currentColor">';
+            const color = getBarColor(signal);
+            
+            for (let i = 0; i < 4; i++) {
+                const opacity = i < bars ? 1 : 0.2;
+                const size = 3 + i * 2;
+                icon += `<path d="M12 ${18 - i * 3}c-${size} 0-${size + 2} ${size}-${size} ${size}s${size + 2} ${size} ${size} ${size} ${size + 2}-${size} ${size}-${size}-${size}-${size}-${size + 2}-${size}" opacity="${opacity}" fill="${color}"/>`;
+            }
+            
+            icon += '</svg>';
+            return icon;
+        }
+
+        // Walking logic
+        function setDirection(direction) {
+            walkingDirection = direction;
+            
+            // Update button states
+            document.querySelectorAll('.walk-btn').forEach(btn => btn.classList.remove('active'));
+            const btnId = 'btn' + direction.charAt(0).toUpperCase() + direction.slice(1);
+            document.getElementById(btnId).classList.add('active');
+        }
+
+        function updateWalking() {
+            if (!isWalking || !walkingDirection) return;
+            
+            const speed = walkingSpeed * 2; // Scale for visual effect
+            let dx = 0, dy = 0;
+            
+            switch(walkingDirection) {
+                case 'up': dy = -speed; break;
+                case 'down': dy = speed; break;
+                case 'left': dx = -speed; break;
+                case 'right': dx = speed; break;
+            }
+            
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+            
+            // Boundary check
+            if (newX >= 20 && newX <= canvas.width - 20 && newY >= 20 && newY <= canvas.height - 20) {
+                player.x = newX;
+                player.y = newY;
+                totalDistance += Math.sqrt(dx * dx + dy * dy) / 10; // Convert to meters
+            }
+            
+            updateSignalDisplay();
+            updateNetworkList();
+            document.getElementById('positionDisplay').textContent = 
+                `${Math.round(player.x / 10 * 100) / 100}, ${Math.round(player.y / 10 * 100) / 100}`;
+            document.getElementById('distance').textContent = totalDistance.toFixed(1);
+        }
+
+        function toggleWalking() {
+            isWalking = !isWalking;
+            document.getElementById('walkBtnText').textContent = isWalking ? 'Stop Walking' : 'Start Walking';
+            document.getElementById('walkingIndicator').style.display = isWalking ? 'inline-flex' : 'none';
+            
+            if (isWalking) {
+                if (!animationId) {
+                    animationId = setInterval(updateWalking, 50);
+                }
+            } else {
+                walkingDirection = null;
+                document.querySelectorAll('.walk-btn').forEach(btn => btn.classList.remove('active'));
+            }
+        }
+
+        function updateSpeed(value) {
+            walkingSpeed = parseInt(value);
+            document.getElementById('speedValue').textContent = value;
+        }
+
+        function addAccessPoint() {
+            const name = prompt('Enter access point name:', `WiFi_${accessPoints.length + 1}`);
+            if (!name) return;
+            
+            const x = Math.random() * (canvas.width - 100) + 50;
+            const y = Math.random() * (canvas.height - 100) + 50;
+            const power = Math.floor(Math.random() * 10) + 15;
+            const channel = [1, 6, 11, 36, 40, 44, 48][Math.floor(Math.random() * 7)];
+            
+            accessPoints.push({
+                id: Date.now(),
+                name,
+                x,
+                y,
+                power,
+                channel
+            });
+            
+            updateNetworkList();
+        }
+
+        function toggleHeatmap() {
+            showHeatmap = !showHeatmap;
+        }
+
+        function resetSimulation() {
+            isWalking = false;
+            walkingDirection = null;
+            totalDistance = 0;
+            signalHistory = [];
+            document.getElementById('walkBtnText').textContent = 'Start Walking';
+            document.getElementById('walkingIndicator').style.display = 'none';
+            document.querySelectorAll('.walk-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('distance').textContent = '0';
+            document.getElementById('avgSignal').textContent = '-';
+            document.getElementById('maxSignal').textContent = '-∞';
+            
+            initAccessPoints();
+            updateSignalDisplay();
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (!isWalking) return;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    setDirection('up');
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    setDirection('down');
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    setDirection('left');
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    setDirection('right');
+                    break;
+                case 'Escape':
+                    toggleWalking();
+                    break;
+            }
+        });
+
+        // Click to move
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            player.x = e.clientX - rect.left;
+            player.y = e.clientY - rect.top;
+            updateSignalDisplay();
+            updateNetworkList();
+            document.getElementById('positionDisplay').textContent = 
+                `${Math.round(player.x / 10 * 100) / 100}, ${Math.round(player.y / 10 * 100) / 100}`;
+        });
+
+        // Initialize
+        initAccessPoints();
+        render();
+        updateSignalDisplay();
+        
+        // Start walking update loop
+        setInterval(updateWalking, 50);
+    </script>
+</body>
+</html>

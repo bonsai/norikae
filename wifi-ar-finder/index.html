@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR WiFi Finder - Optimal Placement</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #arContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #videoElement {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #canvasOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .ui-element {
+            pointer-events: auto;
+        }
+
+        /* Header */
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 20px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title {
+            color: #fff;
+            font-size: 1.3rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title-icon {
+            font-size: 1.5rem;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+        }
+
+        .mode-btn {
+            padding: 8px 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            border-color: #00d4ff;
+            background: rgba(0,212,255,0.2);
+        }
+
+        /* Signal Panel */
+        .signal-panel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            min-width: 180px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .signal-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .signal-main {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .signal-value {
+            font-size: 3rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #00d4ff, #2ed573);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .signal-unit {
+            font-size: 1rem;
+            opacity: 0.7;
+            color: #fff;
+        }
+
+        .signal-quality {
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .quality-excellent { background: rgba(0,212,255,0.3); color: #00d4ff; }
+        .quality-good { background: rgba(46,213,115,0.3); color: #2ed573; }
+        .quality-fair { background: rgba(255,165,2,0.3); color: #ffa502; }
+        .quality-poor { background: rgba(255,71,87,0.3); color: #ff4757; }
+
+        /* Bottom Controls */
+        .bottom-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, transparent 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0,212,255,0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #2ed573, #26b866);
+            color: #fff;
+        }
+
+        .btn-large {
+            padding: 16px 32px;
+            font-size: 1.1rem;
+        }
+
+        /* Scan Overlay */
+        .scan-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 280px;
+            height: 280px;
+            border: 2px solid rgba(0,212,255,0.5);
+            border-radius: 20px;
+            pointer-events: none;
+        }
+
+        .scan-corner {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-color: #00d4ff;
+            border-style: solid;
+        }
+
+        .scan-corner.tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-radius: 15px 0 0 0; }
+        .scan-corner.tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-radius: 0 15px 0 0; }
+        .scan-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-radius: 0 0 0 15px; }
+        .scan-corner.br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-radius: 0 0 15px 0; }
+
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+            animation: scanMove 2s linear infinite;
+        }
+
+        @keyframes scanMove {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+
+        /* Recommendations Panel */
+        .recommendations {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            max-width: 280px;
+            max-height: calc(100vh - 250px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .recommendation-card {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            border-left: 4px solid #00d4ff;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .recommendation-card h4 {
+            color: #fff;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .recommendation-card p {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .recommendation-card .score {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(0,212,255,0.2);
+            color: #00d4ff;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            position: absolute;
+            bottom: 150px;
+            left: 20px;
+            right: 20px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .stat-box {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stat-box .value {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-box .label {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.6);
+            margin-top: 4px;
+        }
+
+        /* Permission Screen */
+        .permission-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .permission-icon {
+            font-size: 5rem;
+            margin-bottom: 30px;
+        }
+
+        .permission-screen h2 {
+            color: #fff;
+            margin-bottom: 15px;
+            font-size: 1.8rem;
+        }
+
+        .permission-screen p {
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Loading */
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 200;
+            border: 1px solid rgba(0,212,255,0.3);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* AR Markers */
+        .ar-marker {
+            position: absolute;
+            padding: 8px 16px;
+            background: rgba(0,212,255,0.9);
+            color: #fff;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            pointer-events: none;
+            animation: markerPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes markerPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* Environment Info */
+        .env-info {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 25px;
+            padding: 10px 20px;
+            display: flex;
+            gap: 20px;
+            font-size: 0.85rem;
+            color: #fff;
+        }
+
+        .env-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Permission Screen -->
+    <div class="permission-screen" id="permissionScreen">
+        <div class="permission-icon">📡</div>
+        <h2>AR WiFi Finder</h2>
+        <p>Find the best WiFi placement points in your home or shop using augmented reality</p>
+        <p style="font-size: 0.9rem; opacity: 0.6;">Camera access recommended but not required</p>
+        <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
+            <button class="control-btn btn-primary btn-large" onclick="requestCamera()">
+                <span>📷</span> Use Camera (AR)
+            </button>
+            <button class="control-btn btn-secondary btn-large" onclick="startWithoutCamera()">
+                <span>🖥️</span> Use Simulation
+            </button>
+        </div>
+        <p style="font-size: 0.85rem; opacity: 0.5; margin-top: 20px;">
+            Simulation mode works on all devices without camera access
+        </p>
+    </div>
+
+    <!-- AR Container -->
+    <div id="arContainer">
+        <video id="videoElement" autoplay playsinline style="display: none;"></video>
+        <canvas id="canvasOverlay"></canvas>
+        <div id="simulationBackground" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);"></div>
+    </div>
+
+    <!-- UI Layer -->
+    <div class="ui-layer">
+        <!-- Header -->
+        <div class="header ui-element">
+            <div class="title">
+                <span class="title-icon">🔍</span>
+                AR WiFi Finder
+            </div>
+            <div class="mode-selector">
+                <button class="mode-btn active" onclick="setMode('house')">🏠 House</button>
+                <button class="mode-btn" onclick="setMode('shop')">🏪 Shop</button>
+            </div>
+        </div>
+
+        <!-- Environment Info -->
+        <div class="env-info ui-element" id="envInfo">
+            <div class="env-item">
+                <span>📐</span>
+                <span id="roomSize">Estimating room...</span>
+            </div>
+            <div class="env-item">
+                <span>📶</span>
+                <span id="interference">Scanning...</span>
+            </div>
+        </div>
+
+        <!-- Signal Panel -->
+        <div class="signal-panel ui-element">
+            <div class="signal-header">
+                <span>📊</span>
+                Signal Strength
+            </div>
+            <div class="signal-main">
+                <div class="signal-value" id="signalValue">--</div>
+                <div class="signal-unit">dBm</div>
+            </div>
+            <div class="signal-quality quality-fair" id="signalQuality">
+                Scanning...
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="recommendations ui-element" id="recommendations">
+            <!-- Dynamic recommendations will appear here -->
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar ui-element">
+            <div class="stat-box">
+                <div class="value" id="statPoints">0</div>
+                <div class="label">Points Scanned</div>
+            </div>
+            <div class="stat-box">
+                <div class="value" id="statBest">--</div>
+                <div class="label">Best Signal</div>
+            </div>
+            <div class="stat-box">
+                <div class="value" id="statAvg">--</div>
+                <div class="label">Avg Signal</div>
+            </div>
+            <div class="stat-box">
+                <div class="value" id="statCoverage">0%</div>
+                <div class="label">Coverage</div>
+            </div>
+        </div>
+
+        <!-- Scan Overlay -->
+        <div class="scan-overlay ui-element" id="scanOverlay">
+            <div class="scan-corner tl"></div>
+            <div class="scan-corner tr"></div>
+            <div class="scan-corner bl"></div>
+            <div class="scan-corner br"></div>
+            <div class="scan-line"></div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="bottom-controls ui-element">
+            <div class="control-row">
+                <button class="control-btn btn-primary btn-large" onclick="scanCurrentPosition()">
+                    <span>📍</span> Scan This Spot
+                </button>
+                <button class="control-btn btn-success btn-large" onclick="markOptimalPoint()">
+                    <span>⭐</span> Mark Optimal
+                </button>
+            </div>
+            <div class="control-row">
+                <button class="control-btn btn-secondary" onclick="toggleHeatmap()">
+                    <span>🔥</span> Heatmap
+                </button>
+                <button class="control-btn btn-secondary" onclick="addVirtualAP()">
+                    <span>📡</span> Add AP
+                </button>
+                <button class="control-btn btn-secondary" onclick="exportReport()">
+                    <span>📋</span> Export
+                </button>
+                <button class="control-btn btn-secondary" onclick="resetScan()">
+                    <span>🔄</span> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // State
+        let video, canvas, ctx;
+        let currentMode = 'house';
+        let scannedPoints = [];
+        let optimalPoints = [];
+        let virtualAPs = [];
+        let showHeatmap = false;
+        let isScanning = false;
+        let deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
+        let roomDimensions = { width: 0, height: 0 };
+
+        // Initialize
+        async function init() {
+            video = document.getElementById('videoElement');
+            canvas = document.getElementById('canvasOverlay');
+            ctx = canvas.getContext('2d');
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Device orientation for AR
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
+            
+            // Start render loop
+            requestAnimationFrame(renderLoop);
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function handleOrientation(event) {
+            deviceOrientation.alpha = event.alpha || 0;
+            deviceOrientation.beta = event.beta || 0;
+            deviceOrientation.gamma = event.gamma || 0;
+            
+            // Estimate room dimensions based on movement
+            estimateRoomSize();
+        }
+
+        async function requestCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                });
+                
+                video.srcObject = stream;
+                video.style.display = 'block';
+                document.getElementById('permissionScreen').classList.add('hidden');
+                
+                showToast('Camera activated - Start scanning!');
+                init();
+                
+                // Simulate initial room scan
+                setTimeout(() => {
+                    roomDimensions = currentMode === 'house' 
+                        ? { width: 5, height: 4 }
+                        : { width: 15, height: 10 };
+                    updateEnvInfo();
+                }, 2000);
+                
+            } catch (err) {
+                console.error('Camera error:', err);
+                showToast('Camera access denied. Switching to simulation mode.');
+                document.getElementById('permissionScreen').querySelector('h2').textContent = 'Camera Not Available';
+                document.getElementById('permissionScreen').querySelector('p').textContent = 'Please use simulation mode instead';
+            }
+        }
+
+        function startWithoutCamera() {
+            document.getElementById('permissionScreen').classList.add('hidden');
+            document.getElementById('simulationBackground').style.display = 'block';
+            document.getElementById('videoElement').style.display = 'none';
+            
+            showToast('Simulation mode activated');
+            init();
+            
+            // Set initial room dimensions
+            roomDimensions = currentMode === 'house' 
+                ? { width: 5, height: 4 }
+                : { width: 15, height: 10 };
+            updateEnvInfo();
+            
+            // Add default virtual AP
+            setTimeout(() => {
+                virtualAPs.push({
+                    id: 1,
+                    name: 'Main Router',
+                    x: roomDimensions.width / 2,
+                    y: roomDimensions.height / 2,
+                    power: 20
+                });
+                showToast('📡 Default router added at room center');
+                updateEnvInfo();
+            }, 500);
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase().includes(mode));
+            });
+            
+            resetScan();
+            showToast(`Switched to ${mode === 'house' ? 'House' : 'Shop'} mode`);
+        }
+
+        function estimateRoomSize() {
+            // Simulated room estimation based on scanning time
+            const scanTime = Date.now() - (window.scanStartTime || Date.now());
+            if (!window.scanStartTime) window.scanStartTime = Date.now();
+            
+            if (currentMode === 'house') {
+                roomDimensions.width = Math.min(3 + scanTime / 1000, 8);
+                roomDimensions.height = Math.min(2.5 + scanTime / 1000, 6);
+            } else {
+                roomDimensions.width = Math.min(10 + scanTime / 500, 30);
+                roomDimensions.height = Math.min(8 + scanTime / 500, 20);
+            }
+            
+            updateEnvInfo();
+        }
+
+        function updateEnvInfo() {
+            document.getElementById('roomSize').textContent = 
+                `${roomDimensions.width.toFixed(1)}m × ${roomDimensions.height.toFixed(1)}m`;
+            
+            const interferenceLevel = virtualAPs.length > 0 ? 
+                `${virtualAPs.length} networks detected` : 'Scanning...';
+            document.getElementById('interference').textContent = interferenceLevel;
+        }
+
+        // Render loop
+        function renderLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw simulation background grid if no camera
+            if (!video.srcObject) {
+                drawSimulationGrid();
+            }
+            
+            // Draw grid overlay
+            if (showHeatmap) {
+                drawHeatmapOverlay();
+            }
+            
+            // Draw scanned points
+            drawScannedPoints();
+            
+            // Draw optimal points
+            drawOptimalPoints();
+            
+            // Draw virtual APs
+            drawVirtualAPs();
+            
+            // Draw center reticle
+            drawReticle();
+            
+            requestAnimationFrame(renderLoop);
+        }
+
+        function drawReticle() {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            
+            ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
+            ctx.lineWidth = 2;
+            
+            // Circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Crosshair
+            ctx.beginPath();
+            ctx.moveTo(cx - 60, cy);
+            ctx.lineTo(cx + 60, cy);
+            ctx.moveTo(cx, cy - 60);
+            ctx.lineTo(cx, cy + 60);
+            ctx.stroke();
+        }
+
+        function drawSimulationGrid() {
+            // Draw room floor plan
+            const roomWidth = canvas.width * 0.8;
+            const roomHeight = canvas.height * 0.6;
+            const roomX = (canvas.width - roomWidth) / 2;
+            const roomY = (canvas.height - roomHeight) / 2;
+            
+            // Room outline
+            ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(roomX, roomY, roomWidth, roomHeight);
+            
+            // Grid inside room
+            ctx.strokeStyle = 'rgba(0, 212, 255, 0.2)';
+            ctx.lineWidth = 1;
+            const gridSize = 50;
+            
+            for (let x = roomX; x < roomX + roomWidth; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, roomY);
+                ctx.lineTo(x, roomY + roomHeight);
+                ctx.stroke();
+            }
+            
+            for (let y = roomY; y < roomY + roomHeight; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(roomX, y);
+                ctx.lineTo(roomX + roomWidth, y);
+                ctx.stroke();
+            }
+            
+            // Room dimensions label
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = '14px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.fillText(
+                `${roomDimensions.width.toFixed(1)}m × ${roomDimensions.height.toFixed(1)}m ${currentMode === 'house' ? 'House' : 'Shop'}`,
+                canvas.width / 2,
+                roomY - 10
+            );
+            
+            // Center marker
+            ctx.fillStyle = 'rgba(0, 212, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('📡', canvas.width / 2, canvas.height / 2);
+        }
+
+        function drawScannedPoints() {
+            scannedPoints.forEach(point => {
+                const screenX = (point.x / roomDimensions.width) * canvas.width;
+                const screenY = (point.y / roomDimensions.height) * canvas.height;
+                
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 8, 0, Math.PI * 2);
+                ctx.fillStyle = getSignalColor(point.signal, 0.8);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+
+        function drawOptimalPoints() {
+            optimalPoints.forEach((point, index) => {
+                const screenX = (point.x / roomDimensions.width) * canvas.width;
+                const screenY = (point.y / roomDimensions.height) * canvas.height;
+                
+                // Glow effect
+                const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, 30);
+                gradient.addColorStop(0, 'rgba(46, 213, 115, 0.6)');
+                gradient.addColorStop(1, 'rgba(46, 213, 115, 0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 30, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Star icon
+                ctx.font = '24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('⭐', screenX, screenY);
+                
+                // Label
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Segoe UI';
+                ctx.fillText(`Optimal ${index + 1}`, screenX, screenY - 25);
+            });
+        }
+
+        function drawVirtualAPs() {
+            virtualAPs.forEach(ap => {
+                const screenX = (ap.x / roomDimensions.width) * canvas.width;
+                const screenY = (ap.y / roomDimensions.height) * canvas.height;
+                
+                // Signal rings
+                for (let i = 3; i > 0; i--) {
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, i * 25, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(0, 212, 255, ${0.2 / i})`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+                
+                // AP icon
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('📡', screenX, screenY);
+                
+                // Label
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Segoe UI';
+                ctx.fillText(ap.name, screenX, screenY - 30);
+            });
+        }
+
+        function drawHeatmapOverlay() {
+            if (scannedPoints.length < 3) return;
+            
+            const gridSize = 20;
+            
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                for (let x = 0; x < canvas.width; x += gridSize) {
+                    const interpolated = interpolateSignal(x, y);
+                    if (interpolated !== null) {
+                        ctx.fillStyle = getSignalColor(interpolated, 0.3);
+                        ctx.fillRect(x, y, gridSize, gridSize);
+                    }
+                }
+            }
+        }
+
+        function interpolateSignal(x, y) {
+            const roomX = (x / canvas.width) * roomDimensions.width;
+            const roomY = (y / canvas.height) * roomDimensions.height;
+            
+            let totalSignal = 0;
+            let totalWeight = 0;
+            
+            scannedPoints.forEach(point => {
+                const dx = roomX - point.x;
+                const dy = roomY - point.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < 2) {
+                    const weight = 1 / (dist + 0.1);
+                    totalSignal += point.signal * weight;
+                    totalWeight += weight;
+                }
+            });
+            
+            return totalWeight > 0 ? totalSignal / totalWeight : null;
+        }
+
+        function getSignalColor(signal, alpha = 1) {
+            if (signal >= -50) return `rgba(0, 212, 255, ${alpha})`;
+            if (signal >= -60) return `rgba(46, 213, 115, ${alpha})`;
+            if (signal >= -70) return `rgba(255, 165, 2, ${alpha})`;
+            if (signal >= -80) return `rgba(255, 71, 87, ${alpha})`;
+            return `rgba(100, 100, 100, ${alpha})`;
+        }
+
+        function getSignalQuality(signal) {
+            if (signal >= -50) return { text: 'Excellent', class: 'quality-excellent' };
+            if (signal >= -60) return { text: 'Good', class: 'quality-good' };
+            if (signal >= -70) return { text: 'Fair', class: 'quality-fair' };
+            if (signal >= -80) return { text: 'Poor', class: 'quality-poor' };
+            return { text: 'Very Poor', class: 'quality-poor' };
+        }
+
+        // Scan current position
+        function scanCurrentPosition() {
+            if (isScanning) return;
+            
+            isScanning = true;
+            const overlay = document.getElementById('scanOverlay');
+            overlay.style.borderColor = '#00d4ff';
+            
+            // Simulate scanning
+            let progress = 0;
+            const scanInterval = setInterval(() => {
+                progress += 10;
+                
+                if (progress >= 100) {
+                    clearInterval(scanInterval);
+                    completeScan();
+                }
+            }, 100);
+        }
+
+        function completeScan() {
+            isScanning = false;
+            const overlay = document.getElementById('scanOverlay');
+            overlay.style.borderColor = 'rgba(0,212,255,0.5)';
+            
+            // In simulation mode, use center position with slight variation
+            const roomX = (Math.random() * 0.6 + 0.2) * roomDimensions.width;
+            const roomY = (Math.random() * 0.6 + 0.2) * roomDimensions.height;
+            
+            let signal = -90;
+            
+            virtualAPs.forEach(ap => {
+                const dx = roomX - ap.x;
+                const dy = roomY - ap.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const apSignal = ap.power - 20 * Math.log10(dist + 1);
+                signal = Math.max(signal, apSignal);
+            });
+            
+            // Add some noise
+            signal += (Math.random() - 0.5) * 10;
+            
+            scannedPoints.push({
+                x: roomX,
+                y: roomY,
+                signal: signal,
+                timestamp: Date.now()
+            });
+            
+            updateSignalDisplay(signal);
+            updateStats();
+            generateRecommendations(signal, roomX, roomY);
+            
+            showToast(`Scanned! Signal: ${Math.round(signal)} dBm`);
+        }
+
+        function updateSignalDisplay(signal) {
+            const valueEl = document.getElementById('signalValue');
+            const qualityEl = document.getElementById('signalQuality');
+            
+            valueEl.textContent = Math.round(signal);
+            
+            const quality = getSignalQuality(signal);
+            qualityEl.textContent = quality.text;
+            qualityEl.className = 'signal-quality ' + quality.class;
+        }
+
+        function updateStats() {
+            document.getElementById('statPoints').textContent = scannedPoints.length;
+            
+            if (scannedPoints.length > 0) {
+                const signals = scannedPoints.map(p => p.signal);
+                const best = Math.max(...signals);
+                const avg = signals.reduce((a, b) => a + b, 0) / signals.length;
+                
+                document.getElementById('statBest').textContent = Math.round(best);
+                document.getElementById('statAvg').textContent = Math.round(avg);
+                
+                // Calculate coverage (percentage of area with good signal)
+                const goodPoints = signals.filter(s => s >= -65).length;
+                const coverage = Math.round((goodPoints / signals.length) * 100);
+                document.getElementById('statCoverage').textContent = coverage + '%';
+            }
+        }
+
+        function generateRecommendations(signal, x, y) {
+            const container = document.getElementById('recommendations');
+            
+            let recommendations = [];
+            
+            if (signal < -70) {
+                recommendations.push({
+                    title: '🚫 Weak Signal Detected',
+                    text: 'This location has poor WiFi coverage. Consider moving closer to the router or adding a range extender.',
+                    score: 'Needs Improvement'
+                });
+            }
+            
+            if (signal >= -60 && signal < -50) {
+                recommendations.push({
+                    title: '✅ Good Location',
+                    text: 'This spot has decent WiFi signal. Suitable for general browsing and streaming.',
+                    score: 'Good'
+                });
+            }
+            
+            if (signal >= -50) {
+                recommendations.push({
+                    title: '🌟 Excellent Spot!',
+                    text: 'Outstanding WiFi signal! Perfect for 4K streaming, gaming, and video calls.',
+                    score: 'Excellent'
+                });
+            }
+            
+            // Mode-specific recommendations
+            if (currentMode === 'house') {
+                if (x < roomDimensions.width * 0.3 || x > roomDimensions.width * 0.7) {
+                    recommendations.push({
+                        title: '🏠 Placement Tip',
+                        text: 'For whole-house coverage, place the router more centrally in your home.',
+                        score: 'Tip'
+                    });
+                }
+            } else {
+                if (scannedPoints.length < 5) {
+                    recommendations.push({
+                        title: '🏪 Shop Coverage',
+                        text: 'Scan more locations to ensure complete customer area coverage.',
+                        score: 'Tip'
+                    });
+                }
+            }
+            
+            container.innerHTML = recommendations.map(rec => `
+                <div class="recommendation-card">
+                    <h4>${rec.title}</h4>
+                    <p>${rec.text}</p>
+                    <span class="score">${rec.score}</span>
+                </div>
+            `).join('');
+        }
+
+        function markOptimalPoint() {
+            if (scannedPoints.length === 0) {
+                showToast('Scan some locations first!');
+                return;
+            }
+            
+            const latestPoint = scannedPoints[scannedPoints.length - 1];
+            
+            optimalPoints.push({
+                x: latestPoint.x,
+                y: latestPoint.y,
+                signal: latestPoint.signal,
+                timestamp: Date.now()
+            });
+            
+            showToast('⭐ Optimal point marked!');
+            
+            // Analyze and provide feedback
+            if (latestPoint.signal >= -50) {
+                showToast('Perfect choice! Excellent signal location.');
+            } else if (latestPoint.signal >= -60) {
+                showToast('Good location marked for reference.');
+            } else {
+                showToast('Marked, but consider finding a better spot.');
+            }
+        }
+
+        function addVirtualAP() {
+            const name = prompt('Access Point Name:', 'WiFi_Router');
+            if (!name) return;
+            
+            const power = parseFloat(prompt('Transmit Power (dBm):', '20')) || 20;
+            
+            // Place AP at center of room
+            virtualAPs.push({
+                id: Date.now(),
+                name,
+                x: roomDimensions.width / 2,
+                y: roomDimensions.height / 2,
+                power
+            });
+            
+            showToast(`📡 ${name} added!`);
+            updateEnvInfo();
+            
+            // In simulation mode, allow dragging to reposition
+            if (!video.srcObject) {
+                showToast('💡 Tip: Click and drag the router to reposition', 4000);
+                enableAPDragging();
+            }
+        }
+
+        function enableAPDragging() {
+            let isDragging = false;
+            let draggedAP = null;
+
+            canvas.addEventListener('mousedown', startDrag);
+            canvas.addEventListener('touchstart', startDrag, { passive: false });
+            canvas.addEventListener('mousemove', drag);
+            canvas.addEventListener('touchmove', drag, { passive: false });
+            canvas.addEventListener('mouseup', endDrag);
+            canvas.addEventListener('touchend', endDrag);
+
+            function startDrag(e) {
+                e.preventDefault();
+                const pos = getCanvasPosition(e);
+                
+                virtualAPs.forEach((ap, index) => {
+                    const screenX = (ap.x / roomDimensions.width) * canvas.width;
+                    const screenY = (ap.y / roomDimensions.height) * canvas.height;
+                    const dist = Math.sqrt(Math.pow(pos.x - screenX, 2) + Math.pow(pos.y - screenY, 2));
+                    
+                    if (dist < 40) {
+                        isDragging = true;
+                        draggedAP = index;
+                        showToast('🎯 Dragging ' + ap.name);
+                    }
+                });
+            }
+
+            function drag(e) {
+                if (!isDragging || draggedAP === null) return;
+                e.preventDefault();
+                
+                const pos = getCanvasPosition(e);
+                const roomWidth = canvas.width * 0.8;
+                const roomHeight = canvas.height * 0.6;
+                const roomX = (canvas.width - roomWidth) / 2;
+                const roomY = (canvas.height - roomHeight) / 2;
+                
+                // Check if within room bounds
+                if (pos.x >= roomX && pos.x <= roomX + roomWidth &&
+                    pos.y >= roomY && pos.y <= roomY + roomHeight) {
+                    const relX = (pos.x - roomX) / roomWidth;
+                    const relY = (pos.y - roomY) / roomHeight;
+                    
+                    virtualAPs[draggedAP].x = relX * roomDimensions.width;
+                    virtualAPs[draggedAP].y = relY * roomDimensions.height;
+                }
+            }
+
+            function endDrag() {
+                if (isDragging) {
+                    showToast('✅ Router repositioned');
+                    isDragging = false;
+                    draggedAP = null;
+                }
+            }
+
+            function getCanvasPosition(e) {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            }
+        }
+
+        function toggleHeatmap() {
+            showHeatmap = !showHeatmap;
+            showToast(showHeatmap ? 'Heatmap enabled' : 'Heatmap disabled');
+        }
+
+        function exportReport() {
+            if (scannedPoints.length === 0) {
+                showToast('No data to export!');
+                return;
+            }
+            
+            const report = {
+                mode: currentMode,
+                roomDimensions,
+                scannedPoints: scannedPoints.length,
+                optimalPoints: optimalPoints.length,
+                bestSignal: Math.max(...scannedPoints.map(p => p.signal)),
+                avgSignal: scannedPoints.map(p => p.signal).reduce((a, b) => a + b, 0) / scannedPoints.length,
+                timestamp: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `wifi-ar-report-${Date.now()}.json`;
+            a.click();
+            
+            showToast('📋 Report exported!');
+        }
+
+        function resetScan() {
+            scannedPoints = [];
+            optimalPoints = [];
+            virtualAPs = [];
+            showHeatmap = false;
+            
+            document.getElementById('signalValue').textContent = '--';
+            document.getElementById('signalQuality').textContent = 'Scanning...';
+            document.getElementById('signalQuality').className = 'signal-quality quality-fair';
+            document.getElementById('recommendations').innerHTML = '';
+            
+            updateStats();
+            updateEnvInfo();
+            
+            showToast('🔄 Reset complete');
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch(e.key.toLowerCase()) {
+                case ' ':
+                case 'enter':
+                    scanCurrentPosition();
+                    break;
+                case 'm':
+                    markOptimalPoint();
+                    break;
+                case 'h':
+                    toggleHeatmap();
+                    break;
+                case 'r':
+                    resetScan();
+                    break;
+            }
+        });
+
+        // Click to scan in simulation mode
+        canvas.addEventListener('click', (e) => {
+            if (video.srcObject) return; // Only in simulation mode
+            
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            // Convert screen coordinates to room coordinates
+            const roomWidth = canvas.width * 0.8;
+            const roomHeight = canvas.height * 0.6;
+            const roomX = (canvas.width - roomWidth) / 2;
+            const roomY = (canvas.height - roomHeight) / 2;
+            
+            // Check if click is inside room
+            if (clickX >= roomX && clickX <= roomX + roomWidth &&
+                clickY >= roomY && clickY <= roomY + roomHeight) {
+                
+                // Calculate relative position in room
+                const relX = (clickX - roomX) / roomWidth;
+                const relY = (clickY - roomY) / roomHeight;
+                
+                const roomCoordX = relX * roomDimensions.width;
+                const roomCoordY = relY * roomDimensions.height;
+                
+                // Calculate signal at this position
+                let signal = -90;
+                virtualAPs.forEach(ap => {
+                    const dx = roomCoordX - ap.x;
+                    const dy = roomCoordY - ap.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const apSignal = ap.power - 20 * Math.log10(dist + 1);
+                    signal = Math.max(signal, apSignal);
+                });
+                
+                signal += (Math.random() - 0.5) * 5;
+                
+                scannedPoints.push({
+                    x: roomCoordX,
+                    y: roomCoordY,
+                    signal: signal,
+                    timestamp: Date.now()
+                });
+                
+                // Draw click indicator
+                ctx.beginPath();
+                ctx.arc(clickX, clickY, 15, 0, Math.PI * 2);
+                ctx.strokeStyle = getSignalColor(signal);
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                updateSignalDisplay(signal);
+                updateStats();
+                generateRecommendations(signal, roomCoordX, roomCoordY);
+                
+                showToast(`Scanned! Signal: ${Math.round(signal)} dBm`);
+            }
+        });
+    </script>
+</body>
+</html>

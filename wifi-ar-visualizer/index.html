@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>WiFi AR Signal Visualizer × MediaPipe</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#000; overflow:hidden; font-family:'Courier New',monospace; }
+
+    /* カメラ映像（ミラー反転） */
+    #camera-feed {
+      position:fixed; top:0; left:0;
+      width:100%; height:100%;
+      object-fit:cover; z-index:0;
+      transform:scaleX(-1); /* セルフィーミラー */
+    }
+
+    /* MediaPipe 手骨格オーバーレイ */
+    #landmark-canvas {
+      position:fixed; top:0; left:0;
+      width:100%; height:100%;
+      z-index:2; pointer-events:none;
+      transform:scaleX(-1);
+    }
+
+    /* Three.js ARキャンバス */
+    #ar-canvas {
+      position:fixed; top:0; left:0;
+      width:100%; height:100%;
+      z-index:3; pointer-events:none;
+    }
+
+    /* ── UIオーバーレイ ── */
+    #ui {
+      position:fixed; top:0; left:0;
+      width:100%; height:100%;
+      z-index:10; pointer-events:none;
+    }
+
+    /* 電波パネル */
+    #signal-panel {
+      position:absolute; top:16px; left:50%; transform:translateX(-50%);
+      background:rgba(0,0,0,0.72); border:1px solid rgba(255,255,255,0.2);
+      border-radius:14px; padding:12px 26px; text-align:center;
+      backdrop-filter:blur(14px); min-width:220px;
+      pointer-events:auto;
+    }
+    #sig-label { font-size:9px; letter-spacing:3px; color:rgba(255,255,255,0.4); text-transform:uppercase; }
+    #sig-val {
+      font-size:36px; font-weight:bold; color:#fff;
+      transition:color .4s, text-shadow .4s; line-height:1.1; margin:4px 0;
+    }
+    #sig-sub { font-size:9px; color:rgba(255,255,255,0.3); }
+    #sig-bar-wrap { width:190px; height:6px; background:rgba(255,255,255,0.08); border-radius:3px; margin:8px auto 0; overflow:hidden; }
+    #sig-bar { height:100%; border-radius:3px; width:0%; transition:width .5s; }
+
+    /* ジェスチャーバッジ */
+    #gesture-badge {
+      position:absolute; top:16px; left:16px;
+      background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.2);
+      border-radius:10px; padding:8px 14px;
+      font-size:11px; color:#fff; backdrop-filter:blur(10px);
+      pointer-events:auto; min-width:160px;
+    }
+    #gesture-icon { font-size:28px; display:block; text-align:center; margin-bottom:4px; }
+    #gesture-name { font-size:10px; letter-spacing:2px; color:rgba(255,255,255,0.6); text-align:center; }
+    #gesture-action { font-size:11px; color:rgba(100,255,200,0.9); text-align:center; margin-top:2px; }
+
+    /* 手の数インジケーター */
+    #hand-indicator {
+      position:absolute; top:16px; right:16px;
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+    }
+    .hand-dot {
+      width:14px; height:14px; border-radius:50%;
+      background:rgba(255,255,255,0.12);
+      transition:background .3s, box-shadow .3s;
+    }
+    #hand-label { font-size:9px; color:rgba(255,255,255,0.35); letter-spacing:1px; }
+
+    /* ネットワーク情報 */
+    #net-info {
+      position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+      background:rgba(0,0,0,0.68); border:1px solid rgba(255,255,255,0.15);
+      border-radius:12px; padding:10px 20px; backdrop-filter:blur(12px);
+      min-width:270px; pointer-events:auto;
+    }
+    .irow { display:flex; justify-content:space-between; gap:20px; margin:3px 0; }
+    .ik { font-size:9px; color:rgba(255,255,255,0.4); letter-spacing:1px; text-transform:uppercase; }
+    .iv { font-size:11px; color:rgba(255,255,255,0.9); font-weight:bold; }
+    #legend { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:8px; padding-top:7px; border-top:1px solid rgba(255,255,255,0.1); }
+    .ld { display:flex; align-items:center; gap:4px; }
+    .ldot { width:9px; height:9px; border-radius:50%; }
+    .ltxt { font-size:9px; color:rgba(255,255,255,0.5); }
+
+    /* デモバッジ */
+    #demo-badge {
+      position:absolute; bottom:20px; right:16px;
+      background:rgba(255,165,0,0.15); border:1px solid rgba(255,165,0,0.4);
+      border-radius:6px; padding:3px 9px;
+      font-size:9px; color:rgba(255,165,0,0.85); letter-spacing:2px; display:none;
+    }
+
+    /* 起動画面 */
+    #start-screen {
+      position:fixed; top:0; left:0; width:100%; height:100%;
+      background:radial-gradient(ellipse at center, #0d0030 0%, #050015 50%, #000 100%);
+      z-index:100; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:18px;
+      pointer-events:auto;
+    }
+    #start-screen h1 {
+      font-size:22px; color:#fff; letter-spacing:4px;
+      text-align:center; line-height:1.7;
+      text-shadow:0 0 40px rgba(140,0,255,.9);
+    }
+    .feat-list {
+      list-style:none; font-size:12px; color:rgba(255,255,255,.6);
+      line-height:2.1; max-width:320px;
+    }
+    .feat-list li::before { content:'▸ '; color:rgba(140,0,255,.9); }
+    #start-btn {
+      padding:14px 44px;
+      background:linear-gradient(135deg,#7700cc,#0055ff);
+      color:#fff; border:none; border-radius:32px;
+      font-size:14px; letter-spacing:3px; cursor:pointer;
+      font-family:'Courier New',monospace; text-transform:uppercase;
+      box-shadow:0 0 40px rgba(100,0,255,.65);
+      transition:transform .2s, box-shadow .2s;
+    }
+    #start-btn:hover { transform:scale(1.06); box-shadow:0 0 65px rgba(100,0,255,.95); }
+    .wifi-icon { font-size:68px; animation:pulse-icon 2.5s ease-in-out infinite; filter:drop-shadow(0 0 24px rgba(140,0,255,.9)); }
+    @keyframes pulse-icon { 0%,100%{opacity:.7;transform:scale(1)} 50%{opacity:1;transform:scale(1.14)} }
+
+    /* ジェスチャーガイド */
+    #gesture-guide {
+      display:grid; grid-template-columns:1fr 1fr; gap:8px;
+      max-width:320px; margin-top:4px;
+    }
+    .gg-item {
+      background:rgba(255,255,255,0.06); border-radius:8px;
+      padding:7px 10px; display:flex; align-items:center; gap:8px;
+    }
+    .gg-icon { font-size:20px; }
+    .gg-text { font-size:10px; color:rgba(255,255,255,.6); line-height:1.5; }
+  </style>
+</head>
+<body>
+
+<video id="camera-feed" autoplay playsinline muted></video>
+<canvas id="landmark-canvas"></canvas>
+<canvas id="ar-canvas"></canvas>
+
+<!-- UI -->
+<div id="ui">
+  <div id="signal-panel">
+    <div id="sig-label">WiFi Signal Strength</div>
+    <div id="sig-val">-- dBm</div>
+    <div id="sig-sub">NetworkInformation API</div>
+    <div id="sig-bar-wrap"><div id="sig-bar"></div></div>
+  </div>
+
+  <div id="gesture-badge">
+    <span id="gesture-icon">✋</span>
+    <div id="gesture-name">WAITING...</div>
+    <div id="gesture-action">手を映してください</div>
+  </div>
+
+  <div id="hand-indicator">
+    <div id="hand-label">HANDS</div>
+    <div class="hand-dot" id="hdot0"></div>
+    <div class="hand-dot" id="hdot1"></div>
+  </div>
+
+  <div id="net-info">
+    <div class="irow"><span class="ik">Connection</span><span class="iv" id="net-type">--</span></div>
+    <div class="irow"><span class="ik">Downlink</span><span class="iv" id="net-dl">-- Mbps</span></div>
+    <div class="irow"><span class="ik">Latency</span><span class="iv" id="net-rtt">-- ms</span></div>
+    <div class="irow"><span class="ik">Quality</span><span class="iv" id="net-qual">--</span></div>
+    <div id="legend">
+      <div class="ld"><div class="ldot" style="background:#9900ff"></div><span class="ltxt">弱 Weak</span></div>
+      <div class="ld"><div class="ldot" style="background:#0066ff"></div><span class="ltxt">普通 Fair</span></div>
+      <div class="ld"><div class="ldot" style="background:#00ffaa"></div><span class="ltxt">良好 Good</span></div>
+      <div class="ld"><div class="ldot" style="background:#ffee00"></div><span class="ltxt">強 Strong</span></div>
+      <div class="ld"><div class="ldot" style="background:#ff2200"></div><span class="ltxt">最強 Excellent</span></div>
+    </div>
+  </div>
+
+  <div id="demo-badge">DEMO MODE</div>
+</div>
+
+<!-- 起動画面 -->
+<div id="start-screen">
+  <div class="wifi-icon">📡</div>
+  <h1>WiFi AR × MediaPipe<br>SIGNAL VISUALIZER</h1>
+  <ul class="feat-list">
+    <li>リアルカメラ映像の上にARエフェクトを重ねる</li>
+    <li>MediaPipe Hands で手をリアルタイム検出</li>
+    <li>電波強度に応じた虹色リング（最大2m）</li>
+    <li>ジェスチャーで電波を操作・遊べる</li>
+  </ul>
+  <div id="gesture-guide">
+    <div class="gg-item"><span class="gg-icon">✋</span><div class="gg-text"><b>開いた手</b><br>波紋を掴む</div></div>
+    <div class="gg-item"><span class="gg-icon">✊</span><div class="gg-text"><b>握る</b><br>電波を圧縮</div></div>
+    <div class="gg-item"><span class="gg-icon">☝️</span><div class="gg-text"><b>指差し</b><br>ビームを発射</div></div>
+    <div class="gg-item"><span class="gg-icon">🤙</span><div class="gg-text"><b>シャカ</b><br>爆発エフェクト</div></div>
+  </div>
+  <button id="start-btn" onclick="startAR()">▶ START AR</button>
+</div>
+
+<!-- ライブラリ -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script>
+'use strict';
+// ============================================================
+//  WiFi AR Signal Visualizer × MediaPipe Hands
+//  Three.js + WebRTC + NetworkInformation API
+// ============================================================
+
+// ── グローバル ──────────────────────────────────────────────
+let scene, cam3d, renderer, clock;
+let centralOrb, orbMat, orbGlowMat, orbOuterMat;
+let ringPool = [];
+let particles, ptclPhase;
+let handTrails = [];           // 手の軌跡パーティクル
+let beamMeshes = [];           // 指ビーム
+let explosionPool = [];        // 爆発エフェクト
+let isRunning = false;
+let demoMode  = false;
+
+// 電波強度
+let signalStrength   = 0.3;
+let targetStrength   = 0.3;
+let smoothedStrength = 0.3;
+
+// リング管理
+const RING_POOL  = 36;
+let   nextRing   = 0;
+let   spawnTimer = 0;
+
+// パーティクル
+const PTCL_COUNT = 200;
+
+// MediaPipe 手データ
+let mpHands = null;
+let handResults = null;   // 最新の MediaPipe 結果
+let detectedHands = [];   // [{landmarks, gesture, wrist3d}]
+
+// ジェスチャー状態
+let currentGesture = 'none';
+let gestureTimer   = 0;
+let grabStrength   = 0;   // 握り強度 0〜1
+let lastWristPos   = [null, null]; // 各手の前フレームwrist位置
+let wristVelocity  = [0, 0];      // 各手の速度
+
+// ランドマークキャンバス
+let lmCtx;
+
+// ── カラーユーティリティ ────────────────────────────────────
+function s2hsl(s) { return (1 - s) * 270; }
+function s2color(s) { return new THREE.Color().setHSL(s2hsl(s) / 360, 1.0, 0.58); }
+function s2radius(s) { return 0.25 + s * 1.75; }
+function s2blink(s)  { return 0.7 + s * 6.3; }
+function s2interval(s) { return 0.75 - s * 0.63; }
+
+// ── AR 起動 ─────────────────────────────────────────────────
+async function startAR() {
+  document.getElementById('start-screen').style.display = 'none';
+
+  // カメラ取得
+  let videoEl = document.getElementById('camera-feed');
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width:{ideal:1280}, height:{ideal:720} },
+      audio: false
+    });
+    videoEl.srcObject = stream;
+    await new Promise(r => videoEl.onloadedmetadata = r);
+  } catch(e) {
+    console.warn('Camera error:', e.message);
+    enableDemo();
+  }
+
+  // ランドマークキャンバス
+  const lmCanvas = document.getElementById('landmark-canvas');
+  lmCanvas.width  = window.innerWidth;
+  lmCanvas.height = window.innerHeight;
+  lmCtx = lmCanvas.getContext('2d');
+
+  initThree();
+  startNetworkMonitor();
+
+  // MediaPipe Hands 初期化
+  if (stream) {
+    initMediaPipe(videoEl);
+  }
+
+  isRunning = true;
+  animate();
+}
+
+// ── MediaPipe Hands ─────────────────────────────────────────
+function initMediaPipe(videoEl) {
+  mpHands = new Hands({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+  });
+  mpHands.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.7,
+    minTrackingConfidence: 0.6
+  });
+  mpHands.onResults(onHandResults);
+
+  // カメラユーティリティで連続フレーム送信
+  const mpCamera = new Camera(videoEl, {
+    onFrame: async () => {
+      await mpHands.send({ image: videoEl });
+    },
+    width: 1280, height: 720
+  });
+  mpCamera.start();
+}
+
+// ── MediaPipe 結果処理 ──────────────────────────────────────
+function onHandResults(results) {
+  handResults = results;
+  detectedHands = [];
+
+  // ランドマーク描画キャンバスをクリア
+  if (lmCtx) {
+    lmCtx.clearRect(0, 0, lmCtx.canvas.width, lmCtx.canvas.height);
+  }
+
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    updateHandIndicator(0);
+    setGestureBadge('none', '✋', 'WAITING', '手を映してください');
+    return;
+  }
+
+  updateHandIndicator(results.multiHandLandmarks.length);
+
+  results.multiHandLandmarks.forEach((landmarks, hi) => {
+    const gesture = classifyGesture(landmarks);
+    const wrist3d = landmarkTo3D(landmarks[0]);
+
+    detectedHands.push({ landmarks, gesture, wrist3d, idx: hi });
+
+    // ランドマーク描画
+    drawHandLandmarks(landmarks, gesture, hi);
+
+    // ジェスチャー処理
+    handleGesture(gesture, landmarks, hi, wrist3d);
+  });
+
+  // 代表ジェスチャー表示
+  if (detectedHands.length > 0) {
+    const g = detectedHands[0].gesture;
+    applyGestureBadge(g);
+  }
+}
+
+// ── ジェスチャー分類 ────────────────────────────────────────
+function classifyGesture(lm) {
+  // 各指の伸び判定（先端 vs 付け根のy座標比較）
+  const fingerTips  = [8, 12, 16, 20];   // 人差し〜小指先端
+  const fingerMids  = [6, 10, 14, 18];   // 第2関節
+  const thumbTip    = lm[4];
+  const thumbBase   = lm[2];
+  const indexTip    = lm[8];
+  const indexBase   = lm[5];
+  const middleTip   = lm[12];
+  const middleBase  = lm[9];
+  const ringTip     = lm[16];
+  const pinkyTip    = lm[20];
+  const pinkyBase   = lm[17];
+  const wrist       = lm[0];
+
+  const extended = fingerTips.map((tip, i) => lm[tip].y < lm[fingerMids[i]].y);
+  const [idx, mid, ring, pinky] = extended;
+
+  // 親指の伸び
+  const thumbExt = Math.abs(thumbTip.x - thumbBase.x) > 0.08;
+
+  // 全指開き（パー）
+  if (idx && mid && ring && pinky) return 'open';
+
+  // 全指閉じ（グー）
+  if (!idx && !mid && !ring && !pinky) return 'fist';
+
+  // 人差し指のみ（指差し）
+  if (idx && !mid && !ring && !pinky) return 'point';
+
+  // 人差し+中指（ピース）
+  if (idx && mid && !ring && !pinky) return 'peace';
+
+  // 親指+小指（シャカ/ハング）
+  const thumbPinkyDist = Math.hypot(thumbTip.x - pinkyTip.x, thumbTip.y - pinkyTip.y);
+  if (thumbExt && pinky && !idx && !mid && !ring && thumbPinkyDist > 0.3) return 'shaka';
+
+  // 親指上（サムズアップ）
+  if (thumbExt && !idx && !mid && !ring && !pinky && thumbTip.y < wrist.y - 0.1) return 'thumbup';
+
+  return 'other';
+}
+
+// ── ジェスチャー → ARアクション ────────────────────────────
+function handleGesture(gesture, lm, handIdx, wrist3d) {
+  const wrist = lm[0];
+  const prev  = lastWristPos[handIdx];
+
+  // 速度計算
+  if (prev) {
+    const dx = wrist.x - prev.x;
+    const dy = wrist.y - prev.y;
+    wristVelocity[handIdx] = Math.sqrt(dx*dx + dy*dy);
+  }
+  lastWristPos[handIdx] = { x: wrist.x, y: wrist.y };
+
+  switch (gesture) {
+    case 'open':
+      // 開いた手 → 手の位置に波紋を引き寄せる
+      grabStrength = 0.8 + signalStrength * 0.2;
+      attractRingsToHand(wrist3d, 0.6);
+      spawnHandTrail(wrist3d, s2color(signalStrength), 0.8);
+      break;
+
+    case 'fist':
+      // 握る → 電波を圧縮（リングを縮小）
+      grabStrength = 1.0;
+      compressRings(wrist3d);
+      spawnHandTrail(wrist3d, new THREE.Color(1, 0.3, 0), 0.5);
+      break;
+
+    case 'point':
+      // 指差し → ビームを発射
+      fireBeam(lm, s2color(signalStrength));
+      spawnHandTrail(wrist3d, s2color(signalStrength), 0.3);
+      break;
+
+    case 'peace':
+      // ピース → 2本ビーム
+      fireBeam(lm, s2color(signalStrength), true);
+      break;
+
+    case 'shaka':
+      // シャカ → 爆発エフェクト
+      if (gestureTimer <= 0) {
+        triggerExplosion(wrist3d, signalStrength);
+        gestureTimer = 0.8;
+      }
+      break;
+
+    case 'thumbup':
+      // サムズアップ → 電波ブースト（targetStrengthを一時的に上げる）
+      targetStrength = Math.min(targetStrength + 0.02, 1.0);
+      spawnHandTrail(wrist3d, new THREE.Color(1, 1, 0), 0.4);
+      break;
+  }
+
+  // 速い動き → 波紋スポーン
+  if (wristVelocity[handIdx] > 0.025) {
+    spawnRingAt(wrist3d, signalStrength * wristVelocity[handIdx] * 30);
+  }
+}
+
+// ── ランドマーク描画 ────────────────────────────────────────
+function drawHandLandmarks(lm, gesture, handIdx) {
+  if (!lmCtx) return;
+  const W = lmCtx.canvas.width;
+  const H = lmCtx.canvas.height;
+  const s = signalStrength;
+  const hue = s2hsl(s);
+  const baseColor = `hsl(${hue},100%,60%)`;
+  const glowColor = `hsl(${hue},100%,80%)`;
+
+  // 接続線
+  const connections = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [5,9],[9,10],[10,11],[11,12],
+    [9,13],[13,14],[14,15],[15,16],
+    [13,17],[17,18],[18,19],[19,20],
+    [0,17]
+  ];
+
+  lmCtx.save();
+  lmCtx.shadowBlur = 12;
+  lmCtx.shadowColor = glowColor;
+  lmCtx.strokeStyle = baseColor;
+  lmCtx.lineWidth = 2;
+  lmCtx.globalAlpha = 0.75;
+
+  connections.forEach(([a, b]) => {
+    // ミラー反転済みキャンバスなので x をそのまま使う
+    const ax = lm[a].x * W, ay = lm[a].y * H;
+    const bx = lm[b].x * W, by = lm[b].y * H;
+    lmCtx.beginPath();
+    lmCtx.moveTo(ax, ay);
+    lmCtx.lineTo(bx, by);
+    lmCtx.stroke();
+  });
+
+  // ランドマーク点
+  lm.forEach((pt, i) => {
+    const x = pt.x * W, y = pt.y * H;
+    const r = (i === 0) ? 7 : (i % 4 === 0) ? 5 : 3;
+    lmCtx.beginPath();
+    lmCtx.arc(x, y, r, 0, Math.PI * 2);
+    lmCtx.fillStyle = (i % 4 === 0) ? '#fff' : glowColor;
+    lmCtx.globalAlpha = 0.9;
+    lmCtx.fill();
+  });
+
+  // ジェスチャーラベル
+  const wx = lm[0].x * W, wy = lm[0].y * H;
+  lmCtx.font = 'bold 13px Courier New';
+  lmCtx.fillStyle = '#fff';
+  lmCtx.shadowBlur = 8;
+  lmCtx.shadowColor = glowColor;
+  lmCtx.globalAlpha = 0.9;
+  const label = gestureLabel(gesture);
+  lmCtx.fillText(label, wx - 20, wy + 28);
+
+  lmCtx.restore();
+}
+
+function gestureLabel(g) {
+  const map = { open:'OPEN ✋', fist:'FIST ✊', point:'POINT ☝️', peace:'PEACE ✌️', shaka:'SHAKA 🤙', thumbup:'BOOST 👍', other:'--', none:'' };
+  return map[g] || '';
+}
+
+function applyGestureBadge(g) {
+  const map = {
+    open:    ['✋','OPEN',    '波紋を引き寄せる'],
+    fist:    ['✊','FIST',    '電波を圧縮'],
+    point:   ['☝️','POINT',   '電波ビーム発射'],
+    peace:   ['✌️','PEACE',   '2本ビーム発射'],
+    shaka:   ['🤙','SHAKA',   '爆発エフェクト！'],
+    thumbup: ['👍','BOOST',   '電波ブースト↑'],
+    other:   ['🖐','GESTURE', '検出中...'],
+    none:    ['✋','WAITING', '手を映してください']
+  };
+  const [icon, name, action] = map[g] || map.none;
+  setGestureBadge(g, icon, name, action);
+}
+
+function setGestureBadge(g, icon, name, action) {
+  document.getElementById('gesture-icon').textContent   = icon;
+  document.getElementById('gesture-name').textContent   = name;
+  document.getElementById('gesture-action').textContent = action;
+}
+
+function updateHandIndicator(count) {
+  [0, 1].forEach(i => {
+    const el = document.getElementById(`hdot${i}`);
+    const on = i < count;
+    const hue = s2hsl(signalStrength);
+    el.style.background = on ? `hsl(${hue},100%,60%)` : 'rgba(255,255,255,0.12)';
+    el.style.boxShadow  = on ? `0 0 10px hsl(${hue},100%,60%)` : 'none';
+  });
+}
+
+// ── ランドマーク → 3D座標変換 ──────────────────────────────
+function landmarkTo3D(lm) {
+  // 正規化座標 (0〜1) → Three.js ワールド座標
+  // x: 0=右端, 1=左端 → ミラー反転して -1.5〜1.5
+  // y: 0=上端, 1=下端 → 1.2〜-1.2
+  // z: -2 (固定奥行き) + lm.z * 0.5
+  const x = (0.5 - lm.x) * 3.0;
+  const y = (0.5 - lm.y) * 2.4;
+  const z = -2 + (lm.z || 0) * 0.5;
+  return new THREE.Vector3(x, y, z);
+}
+
+// ── Three.js 初期化 ─────────────────────────────────────────
+function initThree() {
+  const W = window.innerWidth, H = window.innerHeight;
+  scene = new THREE.Scene();
+  cam3d = new THREE.PerspectiveCamera(60, W/H, 0.01, 200);
+  cam3d.position.set(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById('ar-canvas'),
+    alpha: true, antialias: true
+  });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+
+  clock = new THREE.Clock();
+
+  buildOrb();
+  buildRings();
+  buildParticles();
+  buildBeamPool();
+  buildExplosionPool();
+
+  window.addEventListener('resize', () => {
+    const W2 = window.innerWidth, H2 = window.innerHeight;
+    cam3d.aspect = W2/H2;
+    cam3d.updateProjectionMatrix();
+    renderer.setSize(W2, H2);
+    const lmCanvas = document.getElementById('landmark-canvas');
+    lmCanvas.width = W2; lmCanvas.height = H2;
+  });
+}
+
+// ── 中央オーブ ───────────────────────────────────────────────
+function buildOrb() {
+  orbMat = new THREE.MeshBasicMaterial({ color:0x9900ff, transparent:true, opacity:1 });
+  centralOrb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 32), orbMat);
+  centralOrb.position.set(0, 0, -2);
+  scene.add(centralOrb);
+
+  orbGlowMat = new THREE.MeshBasicMaterial({ color:0x9900ff, transparent:true, opacity:0.28, side:THREE.BackSide });
+  centralOrb.add(new THREE.Mesh(new THREE.SphereGeometry(0.13, 32, 32), orbGlowMat));
+
+  orbOuterMat = new THREE.MeshBasicMaterial({ color:0x9900ff, transparent:true, opacity:0.09, side:THREE.BackSide });
+  centralOrb.add(new THREE.Mesh(new THREE.SphereGeometry(0.28, 32, 32), orbOuterMat));
+}
+
+// ── リングプール ─────────────────────────────────────────────
+function buildRings() {
+  for (let i = 0; i < RING_POOL; i++) {
+    const geo = new THREE.TorusGeometry(1.0, 0.013, 20, 120);
+    const mat = new THREE.MeshBasicMaterial({
+      color:0x9900ff, transparent:true, opacity:0,
+      side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(0, 0, -2);
+    mesh.visible = false;
+    mesh.userData = {
+      active:false, lifetime:0, maxLifetime:2.5,
+      maxRadius:1.0, color:new THREE.Color(0x9900ff),
+      strength:0.3, blinkHz:2.0, orient:i%3, idx:i,
+      targetPos: new THREE.Vector3(0,0,-2),
+      attracted: false
+    };
+    scene.add(mesh);
+    ringPool.push(mesh);
+  }
+}
+
+// ── パーティクル ─────────────────────────────────────────────
+function buildParticles() {
+  const pos = new Float32Array(PTCL_COUNT * 3);
+  const col = new Float32Array(PTCL_COUNT * 3);
+  ptclPhase = new Float32Array(PTCL_COUNT);
+
+  for (let i = 0; i < PTCL_COUNT; i++) {
+    const r = 0.4 + Math.random() * 2.4;
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i*3+2] = -2 + r * Math.cos(phi);
+    col[i*3]   = 0.6; col[i*3+1] = 0; col[i*3+2] = 1;
+    ptclPhase[i] = Math.random() * Math.PI * 2;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.PointsMaterial({
+    size:0.018, vertexColors:true, transparent:true, opacity:0.5,
+    sizeAttenuation:true, blending:THREE.AdditiveBlending, depthWrite:false
+  });
+  particles = new THREE.Points(geo, mat);
+  scene.add(particles);
+}
+
+// ── ビームプール ─────────────────────────────────────────────
+function buildBeamPool() {
+  for (let i = 0; i < 4; i++) {
+    const geo = new THREE.CylinderGeometry(0.004, 0.012, 1, 8);
+    const mat = new THREE.MeshBasicMaterial({
+      color:0x00ffff, transparent:true, opacity:0,
+      blending:THREE.AdditiveBlending, depthWrite:false
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.visible = false;
+    mesh.userData = { active:false, lifetime:0, maxLifetime:0.4 };
+    scene.add(mesh);
+    beamMeshes.push(mesh);
+  }
+}
+
+// ── 爆発プール ───────────────────────────────────────────────
+function buildExplosionPool() {
+  for (let i = 0; i < 3; i++) {
+    const ptcls = [];
+    const N = 40;
+    const pos = new Float32Array(N * 3);
+    const col = new Float32Array(N * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({
+      size:0.04, vertexColors:true, transparent:true, opacity:0,
+      sizeAttenuation:true, blending:THREE.AdditiveBlending, depthWrite:false
+    });
+    const pts = new THREE.Points(geo, mat);
+    pts.visible = false;
+    pts.userData = {
+      active:false, lifetime:0, maxLifetime:1.2,
+      velocities: Array.from({length:N}, () => new THREE.Vector3(
+        (Math.random()-0.5)*2, (Math.random()-0.5)*2, (Math.random()-0.5)*2
+      )),
+      origin: new THREE.Vector3()
+    };
+    scene.add(pts);
+    explosionPool.push(pts);
+  }
+}
+
+// ── 手の軌跡スポーン ─────────────────────────────────────────
+function spawnHandTrail(pos3d, color, strength) {
+  // パーティクルシステムの一部を手の位置に移動
+  if (!particles) return;
+  const posArr = particles.geometry.attributes.position.array;
+  const colArr = particles.geometry.attributes.color.array;
+  const idx = Math.floor(Math.random() * PTCL_COUNT);
+  posArr[idx*3]   = pos3d.x + (Math.random()-0.5)*0.1;
+  posArr[idx*3+1] = pos3d.y + (Math.random()-0.5)*0.1;
+  posArr[idx*3+2] = pos3d.z + (Math.random()-0.5)*0.1;
+  colArr[idx*3]   = color.r;
+  colArr[idx*3+1] = color.g;
+  colArr[idx*3+2] = color.b;
+  particles.geometry.attributes.position.needsUpdate = true;
+  particles.geometry.attributes.color.needsUpdate    = true;
+}
+
+// ── リングを手に引き寄せる ───────────────────────────────────
+function attractRingsToHand(handPos, strength) {
+  ringPool.forEach(ring => {
+    if (!ring.userData.active) return;
+    const dir = handPos.clone().sub(ring.position);
+    const dist = dir.length();
+    if (dist < 2.0) {
+      dir.normalize().multiplyScalar(strength * 0.04);
+      ring.position.add(dir);
+    }
+  });
+}
+
+// ── リングを圧縮 ─────────────────────────────────────────────
+function compressRings(handPos) {
+  ringPool.forEach(ring => {
+    if (!ring.userData.active) return;
+    const dist = ring.position.distanceTo(handPos);
+    if (dist < 1.5) {
+      ring.userData.maxRadius *= 0.92;
+      if (ring.userData.maxRadius < 0.05) {
+        ring.userData.active = false;
+        ring.visible = false;
+      }
+    }
+  });
+}
+
+// ── 指ビーム発射 ─────────────────────────────────────────────
+function fireBeam(lm, color, dual = false) {
+  const tips = dual ? [lm[8], lm[12]] : [lm[8]];
+  const bases = dual ? [lm[5], lm[9]] : [lm[5]];
+
+  tips.forEach((tip, i) => {
+    const beam = beamMeshes.find(b => !b.userData.active);
+    if (!beam) return;
+
+    const tipPos  = landmarkTo3D(tip);
+    const basePos = landmarkTo3D(bases[i]);
+    const dir = tipPos.clone().sub(basePos).normalize();
+    const len = 1.5 + signalStrength * 2.0;
+
+    const mid = tipPos.clone().add(dir.clone().multiplyScalar(len * 0.5));
+    beam.position.copy(mid);
+    beam.scale.set(1, len, 1);
+    beam.lookAt(tipPos.clone().add(dir));
+    beam.rotateX(Math.PI / 2);
+
+    beam.material.color.copy(color);
+    beam.material.opacity = 0.9;
+    beam.visible = true;
+    beam.userData.active = true;
+    beam.userData.lifetime = 0;
+    beam.userData.maxLifetime = 0.3;
+
+    // ビーム先端に波紋スポーン
+    const endPos = tipPos.clone().add(dir.clone().multiplyScalar(len));
+    spawnRingAt(endPos, signalStrength * 0.8);
+  });
+}
+
+// ── 爆発エフェクト ───────────────────────────────────────────
+function triggerExplosion(pos, strength) {
+  const exp = explosionPool.find(e => !e.userData.active);
+  if (!exp) return;
+
+  const ud = exp.userData;
+  ud.active = true;
+  ud.lifetime = 0;
+  ud.origin.copy(pos);
+  exp.visible = true;
+
+  const posArr = exp.geometry.attributes.position.array;
+  const colArr = exp.geometry.attributes.color.array;
+  const N = posArr.length / 3;
+  const col = s2color(strength);
+
+  for (let i = 0; i < N; i++) {
+    posArr[i*3]   = pos.x;
+    posArr[i*3+1] = pos.y;
+    posArr[i*3+2] = pos.z;
+    colArr[i*3]   = col.r;
+    colArr[i*3+1] = col.g;
+    colArr[i*3+2] = col.b;
+    ud.velocities[i].set(
+      (Math.random()-0.5) * (1.5 + strength * 2),
+      (Math.random()-0.5) * (1.5 + strength * 2),
+      (Math.random()-0.5) * (1.5 + strength * 2)
+    );
+  }
+  exp.geometry.attributes.position.needsUpdate = true;
+  exp.geometry.attributes.color.needsUpdate    = true;
+  exp.material.opacity = 1.0;
+
+  // 爆発と同時に大きなリング
+  for (let j = 0; j < 3; j++) {
+    setTimeout(() => spawnRingAt(pos, strength), j * 80);
+  }
+}
+
+// ── 任意位置にリングスポーン ─────────────────────────────────
+function spawnRingAt(pos, strength) {
+  let ring = null;
+  for (let i = 0; i < RING_POOL; i++) {
+    const r = ringPool[(nextRing + i) % RING_POOL];
+    if (!r.userData.active) { ring = r; break; }
+  }
+  if (!ring) ring = ringPool[nextRing % RING_POOL];
+  nextRing = (nextRing + 1) % RING_POOL;
+
+  const s = Math.min(Math.max(strength, 0.02), 1.0);
+  const ud = ring.userData;
+  ud.active      = true;
+  ud.lifetime    = 0;
+  ud.strength    = s;
+  ud.maxRadius   = s2radius(s);
+  ud.maxLifetime = 1.6 + s * 1.4;
+  ud.blinkHz     = s2blink(s);
+  ud.color.copy(s2color(s));
+  ud.attracted   = false;
+
+  ring.rotation.set(0, 0, 0);
+  if (ud.orient === 0) {
+    ring.rotation.x = Math.PI/2 + (Math.random()-0.5)*0.2;
+    ring.rotation.z = (Math.random()-0.5)*0.2;
+  } else if (ud.orient === 1) {
+    ring.rotation.x = (Math.random()-0.5)*0.3;
+    ring.rotation.y = Math.random()*Math.PI;
+  } else {
+    ring.rotation.x = Math.PI/4 + (Math.random()-0.5)*0.5;
+    ring.rotation.y = Math.random()*Math.PI*2;
+    ring.rotation.z = (Math.random()-0.5)*0.5;
+  }
+
+  ring.position.copy(pos);
+  ring.scale.setScalar(0.001);
+  ring.material.opacity = 0;
+  ring.visible = true;
+}
+
+// ── ネットワーク監視 ─────────────────────────────────────────
+function startNetworkMonitor() {
+  readNet();
+  if ('connection' in navigator) {
+    navigator.connection.addEventListener('change', readNet);
+    setInterval(readNet, 1500);
+  } else {
+    enableDemo();
+  }
+}
+
+function readNet() {
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!c) { enableDemo(); return; }
+  const s = calcStrength(c);
+  targetStrength = s;
+  updateUI(s, c);
+}
+
+function calcStrength(c) {
+  let sc = 0, n = 0;
+  const etMap = { 'slow-2g':0.05, '2g':0.2, '3g':0.5, '4g':0.85 };
+  if (c.effectiveType && etMap[c.effectiveType] !== undefined) { sc += etMap[c.effectiveType]; n++; }
+  if (c.downlink > 0)  { sc += Math.min(c.downlink/100, 1); n++; }
+  if (c.rtt > 0)       { sc += Math.max(0, 1 - c.rtt/2000); n++; }
+  const tMap = { wifi:0.85, ethernet:1.0, cellular:0.5, none:0 };
+  if (c.type && tMap[c.type] !== undefined) { sc += tMap[c.type]; n++; }
+  return n > 0 ? Math.min(Math.max(sc/n, 0.02), 1) : 0.5;
+}
+
+let demoPhase = 0;
+function enableDemo() {
+  if (demoMode) return;
+  demoMode = true;
+  document.getElementById('demo-badge').style.display = 'block';
+  setInterval(() => {
+    demoPhase += 0.007;
+    const base  = 0.5 + 0.45 * Math.sin(demoPhase*0.55) * Math.cos(demoPhase*0.22);
+    const noise = (Math.random()-0.5)*0.07;
+    targetStrength = Math.min(Math.max(base+noise, 0.03), 1.0);
+    const dBm = Math.round(-90 + targetStrength*60);
+    setUIVals(targetStrength, dBm+' dBm', 'WiFi (demo)', '-- Mbps', '-- ms', qualLabel(targetStrength));
+  }, 80);
+}
+
+function updateUI(s, c) {
+  const dBm = Math.round(-90 + s*60);
+  setUIVals(s, dBm+' dBm',
+    (c.effectiveType||c.type||'unknown').toUpperCase(),
+    c.downlink>0 ? c.downlink.toFixed(1)+' Mbps' : '-- Mbps',
+    c.rtt>0 ? c.rtt+' ms' : '-- ms',
+    qualLabel(s)
+  );
+}
+
+function qualLabel(s) {
+  if (s<0.2)  return '🔴 WEAK';
+  if (s<0.45) return '🟠 FAIR';
+  if (s<0.68) return '🟡 GOOD';
+  if (s<0.87) return '🟢 STRONG';
+  return '💎 EXCELLENT';
+}
+
+function setUIVals(s, dBm, type, dl, rtt, qual) {
+  const hue   = s2hsl(s);
+  const color = `hsl(${hue.toFixed(0)},100%,60%)`;
+  const v = document.getElementById('sig-val');
+  v.textContent = dBm;
+  v.style.color = color;
+  v.style.textShadow = `0 0 28px ${color}, 0 0 8px ${color}`;
+  const bar = document.getElementById('sig-bar');
+  bar.style.width = (s*100).toFixed(1)+'%';
+  bar.style.background = `linear-gradient(90deg,hsl(270,100%,55%) 0%,hsl(240,100%,55%) 20%,hsl(180,100%,50%) 40%,hsl(90,100%,50%) 60%,hsl(50,100%,55%) 80%,hsl(0,100%,55%) 100%)`;
+  document.getElementById('net-type').textContent = type;
+  document.getElementById('net-dl').textContent   = dl;
+  document.getElementById('net-rtt').textContent  = rtt;
+  document.getElementById('net-qual').textContent = qual;
+}
+
+// ── メインループ ─────────────────────────────────────────────
+function animate() {
+  if (!isRunning) return;
+  requestAnimationFrame(animate);
+  const delta   = clock.getDelta();
+  const elapsed = clock.getElapsedTime();
+
+  smoothedStrength += (targetStrength - smoothedStrength) * 0.04;
+  signalStrength = smoothedStrength;
+
+  if (gestureTimer > 0) gestureTimer -= delta;
+
+  tickOrb(elapsed);
+  tickSpawn(delta, elapsed);
+  tickRings(delta, elapsed);
+  tickParticles(elapsed);
+  tickBeams(delta);
+  tickExplosions(delta);
+
+  renderer.render(scene, cam3d);
+}
+
+// ── オーブ ───────────────────────────────────────────────────
+function tickOrb(t) {
+  if (!centralOrb) return;
+  const col = s2color(signalStrength);
+  orbMat.color.copy(col);
+  orbGlowMat.color.copy(col);
+  orbOuterMat.color.copy(col);
+  const sc = 0.55 + signalStrength * 2.25;
+  centralOrb.scale.setScalar(sc);
+  const hz    = s2blink(signalStrength);
+  const blink = 0.5 + 0.5 * Math.sin(t * hz * Math.PI * 2);
+  orbMat.opacity      = 0.85 * blink + 0.15;
+  orbGlowMat.opacity  = (0.18 + signalStrength*0.15) * blink;
+  orbOuterMat.opacity = (0.06 + signalStrength*0.06) * blink;
+  centralOrb.position.y = Math.sin(t*0.85)*0.07;
+  centralOrb.rotation.y = t*0.38;
+
+  // 手が近い場合はオーブが手に引き寄せられる
+  if (detectedHands.length > 0) {
+    const hw = detectedHands[0].wrist3d;
+    const dist = centralOrb.position.distanceTo(hw);
+    if (dist < 1.2 && detectedHands[0].gesture === 'open') {
+      const dir = hw.clone().sub(centralOrb.position).normalize().multiplyScalar(0.03);
+      centralOrb.position.add(dir);
+    } else {
+      // 元の位置に戻る
+      const home = new THREE.Vector3(0, Math.sin(t*0.85)*0.07, -2);
+      centralOrb.position.lerp(home, 0.05);
+    }
+  }
+}
+
+// ── リング自動スポーン ───────────────────────────────────────
+function tickSpawn(delta, elapsed) {
+  spawnTimer += delta;
+  if (spawnTimer >= s2interval(signalStrength)) {
+    spawnTimer = 0;
+    spawnRingAt(centralOrb.position.clone(), signalStrength);
+  }
+}
+
+// ── リング更新 ───────────────────────────────────────────────
+function tickRings(delta, elapsed) {
+  ringPool.forEach(ring => {
+    if (!ring.userData.active) return;
+    const ud = ring.userData;
+    ud.lifetime += delta;
+    const t = ud.lifetime / ud.maxLifetime;
+    if (t >= 1.0) {
+      ud.active = false;
+      ring.visible = false;
+      ring.material.opacity = 0;
+      return;
+    }
+    const eased  = 1 - Math.pow(1-t, 3);
+    const radius = eased * ud.maxRadius;
+    ring.scale.setScalar(radius);
+    const fadeIn = 0.1;
+    let opacity;
+    if (t < fadeIn) {
+      opacity = t / fadeIn;
+    } else {
+      opacity = Math.pow(1-(t-fadeIn)/(1-fadeIn), 1.4);
+    }
+    const blink = 0.6 + 0.4 * Math.sin(elapsed * ud.blinkHz * Math.PI * 2 + ud.idx * 0.9);
+    ring.material.opacity = opacity * blink;
+    ring.material.color.copy(ud.color);
+    ring.position.y += eased * ud.strength * 0.001;
+  });
+}
+
+// ── パーティクル ─────────────────────────────────────────────
+function tickParticles(elapsed) {
+  if (!particles) return;
+  const col = s2color(signalStrength);
+  particles.material.color.copy(col);
+  particles.material.size = 0.014 + signalStrength * 0.022;
+  const hz    = s2blink(signalStrength) * 0.4;
+  const blink = 0.45 + 0.55 * Math.sin(elapsed * hz * Math.PI * 2);
+  particles.material.opacity = (0.15 + signalStrength*0.4) * blink;
+  particles.rotation.y = elapsed * 0.04;
+  particles.rotation.x = elapsed * 0.015;
+}
+
+// ── ビーム更新 ───────────────────────────────────────────────
+function tickBeams(delta) {
+  beamMeshes.forEach(beam => {
+    if (!beam.userData.active) return;
+    beam.userData.lifetime += delta;
+    const t = beam.userData.lifetime / beam.userData.maxLifetime;
+    if (t >= 1.0) {
+      beam.userData.active = false;
+      beam.visible = false;
+      beam.material.opacity = 0;
+      return;
+    }
+    beam.material.opacity = (1 - t) * 0.9;
+  });
+}
+
+// ── 爆発更新 ─────────────────────────────────────────────────
+function tickExplosions(delta) {
+  explosionPool.forEach(exp => {
+    if (!exp.userData.active) return;
+    const ud = exp.userData;
+    ud.lifetime += delta;
+    const t = ud.lifetime / ud.maxLifetime;
+    if (t >= 1.0) {
+      ud.active = false;
+      exp.visible = false;
+      exp.material.opacity = 0;
+      return;
+    }
+    const posArr = exp.geometry.attributes.position.array;
+    const N = posArr.length / 3;
+    for (let i = 0; i < N; i++) {
+      posArr[i*3]   += ud.velocities[i].x * delta;
+      posArr[i*3+1] += ud.velocities[i].y * delta;
+      posArr[i*3+2] += ud.velocities[i].z * delta;
+      ud.velocities[i].multiplyScalar(0.95); // 減速
+    }
+    exp.geometry.attributes.position.needsUpdate = true;
+    exp.material.opacity = (1 - t) * 0.9;
+    exp.material.size = 0.04 + t * 0.06;
+  });
+}
+</script>
+</body>
+</html>
