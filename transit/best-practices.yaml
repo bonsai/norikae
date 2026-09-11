@@ -1,0 +1,78 @@
+version: 1
+name: tokyo-transfer-best-practices
+purpose: "乗り換え検索を時間だけでなく、乗換負荷・余裕・信頼性・歩行・体験価値で改善するための知識ベース"
+updated: 2026-09-12
+
+principles:
+  - id: shortest-is-not-always-best
+    rule: "最短時間を常に最適解としない"
+    prefer:
+      - "乗換回数が少ない"
+      - "ホーム移動が短い"
+      - "迷いにくい"
+      - "遅延時の代替がある"
+    avoid:
+      - "数分短縮のため複雑な乗換を選ぶ"
+    confidence: high
+    source: design-principle
+
+  - id: transfer-margin-matters
+    rule: "乗換時間は必要時間だけでなく余裕時間を評価する"
+    prefer:
+      - "大きな駅では余裕を持つ"
+      - "初めて使う駅では余裕を増やす"
+    avoid:
+      - "標準乗換時間ぴったりの計画"
+    confidence: high
+    source: design-principle
+
+  - id: minimize-complexity
+    rule: "同程度の所要時間なら乗換回数と判断回数を減らす"
+    prefer:
+      - "直通"
+      - "同一ホーム乗換"
+      - "乗換先が明確な駅"
+    avoid:
+      - "複数路線を短時間で連続して乗り換える経路"
+    confidence: high
+    source: design-principle
+
+  - id: preserve-alternatives
+    rule: "遅延や混雑で破綻したときの代替経路を残す"
+    prefer:
+      - "別路線への切替可能性"
+      - "主要駅でのリカバリー"
+    avoid:
+      - "一箇所の接続失敗で全行程が崩れる経路"
+    confidence: medium
+    source: design-principle
+
+  - id: distinguish-transfer-and-experience
+    rule: "乗換の最適化と街・イベント体験の最適化を別レイヤーで扱う"
+    prefer:
+      - "transit graph"
+      - "experience graph"
+    avoid:
+      - "体験価値を交通コストだけで消す"
+    confidence: high
+    source: ecosystem-design
+
+examples:
+  - id: toritsu-daigaku-shimokitazawa-gotanda
+    from: 都立大学
+    destination: 五反田
+    optional_stop: 下北沢
+    transit_pattern:
+      - "都立大学 → 渋谷"
+      - "渋谷 → 下北沢"
+      - "下北沢 → 渋谷"
+      - "渋谷 → 五反田"
+    lesson: "下北沢を体験として挟む場合、交通上の最短ではなく体験を含む経路として記録する"
+    confidence: medium
+    source: route-example
+
+schema:
+  practice: "再利用可能な乗換判断ルール"
+  example: "具体的な経路から抽出した知見"
+  confidence: "high / medium / low。事実の確度ではなく、ルールとしての再利用確度"
+  source: "official / measurement / route-example / user-feedback / design-principle"
